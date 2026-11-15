@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Class Hub - TagaDetect</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Shared Global Navbar Container -->
+  <div id="navbar-container"></div>
+
+  <!-- Main Container -->
+  <main class="container">
+    <!-- Breadcrumb -->
+    <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted);">
+      <a href="index.html" style="color: var(--text-muted); text-decoration: none; font-weight: 500;">← Back to Classes</a>
+      <span>/</span>
+      <span id="breadcrumb-class-name" style="color: var(--text-main); font-weight: 600;">Class Page</span>
+    </div>
+
+    <!-- Class Page Container -->
+    <div id="class-detail-content"></div>
+  </main>
+
+  <!-- Pass Activity Modal (Students) -->
+  <div class="modal-backdrop" id="pass-activity-modal">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="pass-modal-title">Pass Activity Submission</h2>
+          <p class="modal-subtitle" id="pass-modal-sub">Draft or paste your written activity. It will be reviewed automatically by TagaDetect.</p>
+        </div>
+        <button class="modal-close-btn" onclick="TagaNav.closeModal('pass-activity-modal')">✕</button>
+      </div>
+
+      <input type="hidden" id="pass-activity-id" />
+
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label" style="margin-bottom: 0;">Your Written Submission</label>
+          <span style="font-size: 12px; color: var(--text-muted);"><span id="pass-word-count">0</span> words</span>
+        </div>
+        <textarea id="pass-text-input" class="form-textarea" style="min-height: 200px; font-size: 14px; line-height: 1.6;" placeholder="Type or paste your complete assignment essay, reflection, or technical report here..." oninput="updatePassWordCount(this.value)"></textarea>
+      </div>
+
+      <div style="background: rgba(156, 107, 255, 0.08); border: 1px solid rgba(156, 107, 255, 0.25); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 20px; font-size: 12px; color: var(--text-muted);">
+        <strong style="color: var(--accent-purple);">Automated AI Review Notice:</strong> Upon passing, TagaDetect automatically evaluates token shuffling heuristics and sentence cadence. Both you and your professor receive the identical diagnostic report.
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="TagaNav.closeModal('pass-activity-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitPassedActivity()">Pass & Run Automated Review</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Publish Activity Modal (Professors) -->
+  <div class="modal-backdrop" id="publish-activity-modal">
+    <div class="modal-card" style="max-width: 620px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Publish Class Activity</h2>
+          <p class="modal-subtitle">Create a text-based assignment with scoring rubrics</p>
+        </div>
+        <button class="modal-close-btn" onclick="TagaNav.closeModal('publish-activity-modal')">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Activity Title</label>
+        <input type="text" id="new-act-title" class="form-input" placeholder="e.g. Activity 3: Automata Finite State Machine Analysis" />
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label class="form-label">Due Date</label>
+          <input type="date" id="new-act-due" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Total Points</label>
+          <input type="number" id="new-act-points" class="form-input" value="100" min="10" max="100" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Instructions & Prompt</label>
+        <textarea id="new-act-instructions" class="form-textarea" placeholder="Detail the questions, length requirements, and citations expected..."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="TagaNav.closeModal('publish-activity-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitPublishActivity()">Publish to Class</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Material Modal (Professors) -->
+  <div class="modal-backdrop" id="add-material-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Upload Course Material</h2>
+          <p class="modal-subtitle">Add syllabus, lecture slides, manuals, or reference guides</p>
+        </div>
+        <button class="modal-close-btn" onclick="TagaNav.closeModal('add-material-modal')">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Document Title</label>
+        <input type="text" id="mat-title-input" class="form-input" placeholder="e.g. Module 3: State Minimization Slides (PDF)" />
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select id="mat-category-input" class="form-input">
+            <option value="Lecture Slides">Lecture Slides</option>
+            <option value="Syllabus">Course Syllabus</option>
+            <option value="Lab Manual">Lab Manual</option>
+            <option value="Reference Sheet">Reference Sheet</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">File Type</label>
+          <select id="mat-type-input" class="form-input">
+            <option value="PDF">PDF Document</option>
+            <option value="SLIDES">Slide Presentation</option>
+            <option value="DOC">Word Document</option>
+            <option value="TOOL">Interactive Lab Tool</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Brief Description</label>
+        <input type="text" id="mat-desc-input" class="form-input" placeholder="e.g. Complete lecture presentation including DFAs and NFAs." />
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="TagaNav.closeModal('add-material-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitAddMaterial()">Upload to Class Hub</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inspection Modal (Reviewing Automated AI Report) -->
+  <div class="modal-backdrop" id="review-modal">
+    <div class="modal-card" style="max-width: 720px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title" id="review-modal-title">Automated AI Diagnostic Report</h2>
+          <p class="modal-subtitle" id="review-modal-sub">Transparent AI review generated upon passing submission</p>
+        </div>
+        <button class="modal-close-btn" onclick="TagaNav.closeModal('review-modal')">✕</button>
+      </div>
+
+      <div id="review-modal-body"></div>
+
+      <div class="modal-actions" style="margin-top: 24px;">
+        <button class="btn btn-secondary" onclick="TagaNav.closeModal('review-modal')">Close Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grade Submission Modal (Professors) -->
+  <div class="modal-backdrop" id="grade-modal">
+    <div class="modal-card" style="max-width: 650px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Grade Activity Submission</h2>
+          <p class="modal-subtitle" id="grade-modal-student-name">Reviewing student submission</p>
+        </div>
+        <button class="modal-close-btn" onclick="TagaNav.closeModal('grade-modal')">✕</button>
+      </div>
+
+      <input type="hidden" id="grade-sub-id" />
+
+      <div class="form-group">
+        <label class="form-label">Submission Excerpt</label>
+        <div id="grade-submission-excerpt" style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px; font-size: 13px; max-height: 140px; overflow-y: auto; color: var(--text-muted);"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Automated AI Detection Review</label>
+        <div id="grade-ai-badge" style="display: flex; align-items: center; gap: 12px;"></div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Score (Points)</label>
+        <input type="number" id="grade-score-input" class="form-input" min="0" max="100" value="95" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Professor Written Feedback</label>
+        <textarea id="grade-feedback-input" class="form-textarea" placeholder="Provide constructive feedback and rubric remarks for the student..."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="TagaNav.closeModal('grade-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitGrade()">Record Grade</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="data.js"></script>
+  <script src="ai-engine.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    let activeClassId = null;
+    let activeTab = 'activities'; // 'activities', 'materials', 'people'
+
+    document.addEventListener('DOMContentLoaded', () => {
+      TagaNav.renderNavbar('home');
+
+      const urlParams = new URLSearchParams(window.location.search);
+      activeClassId = urlParams.get('id');
+
+      const classes = TagaStore.get(STORAGE_KEYS.CLASSES, INITIAL_CLASSES);
+      if (!activeClassId || !classes.find(c => c.id === activeClassId)) {
+        activeClassId = classes[0].id;
+      }
+
+      renderClassPage();
+    });
+
+    function switchTab(tabName) {
+      activeTab = tabName;
+      renderClassPage();
+    }
+
+    function renderClassPage() {
+      const classes = TagaStore.get(STORAGE_KEYS.CLASSES, INITIAL_CLASSES);
+      const cls = classes.find(c => c.id === activeClassId);
+      if (!cls) return;
+
+      document.getElementById('breadcrumb-class-name').textContent = cls.subjectName;
+
+      const activities = TagaStore.get(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES).filter(a => a.classId === cls.id);
+      const materials = TagaStore.get(STORAGE_KEYS.MATERIALS, INITIAL_MATERIALS).filter(m => m.classId === cls.id);
+      const submissions = TagaStore.get(STORAGE_KEYS.SUBMISSIONS, INITIAL_SUBMISSIONS);
+      const users = TagaStore.get(STORAGE_KEYS.USERS, INITIAL_USERS);
+      const currentUser = TagaNav.getCurrentUser();
+      const isStudent = currentUser.role === 'student';
+      const isProf = currentUser.role === 'professor';
+
+      const container = document.getElementById('class-detail-content');
+      container.innerHTML = `
+        <!-- Class Hero Banner -->
+        <div class="class-page-header">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; flex-wrap: wrap;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                <span class="clean-subject-badge">CODE: ${cls.code}</span>
+                <span class="clean-section-tag">${cls.section}</span>
+              </div>
+              <h1 style="font-size: 26px; font-weight: 800; color: var(--text-main); margin-bottom: 8px;">
+                ${cls.subjectName}
+              </h1>
+              <p style="color: var(--text-muted); font-size: 14px; max-width: 680px;">
+                ${cls.description}
+              </p>
+              <div style="display: flex; align-items: center; gap: 16px; margin-top: 14px; font-size: 13px; color: var(--text-muted);">
+                <span>📍 ${cls.room}</span>
+                <span>•</span>
+                <span>⏰ ${cls.schedule}</span>
+              </div>
+            </div>
+
+            <!-- Instructor & Code Quick Box -->
+            <div style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px 20px; min-width: 250px;">
+              <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">
+                Course Instructor
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <img src="${cls.professorAvatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'}" style="width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--accent-purple);" />
+                <div>
+                  <div style="font-size: 13px; font-weight: 700; color: var(--text-main);">${cls.professorName}</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">Lead Faculty</div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                <span style="font-size: 12px; color: var(--text-muted);">Class Code</span>
+                <button class="clean-subject-badge" style="cursor: pointer; background: transparent;" onclick="copyClassCode('${cls.code}')" title="Click to copy">
+                  ${cls.code} 📋
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Navigation Subtabs -->
+          <div class="class-tabs-nav" style="display: flex; gap: 10px; margin-top: 28px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
+            <button class="btn ${activeTab === 'activities' ? 'btn-primary' : 'btn-secondary'}" onclick="switchTab('activities')" style="padding: 7px 16px; font-size: 13px;">
+              📝 Activities & Passing (${activities.length})
+            </button>
+            <button class="btn ${activeTab === 'materials' ? 'btn-primary' : 'btn-secondary'}" onclick="switchTab('materials')" style="padding: 7px 16px; font-size: 13px;">
+              📁 Class Materials (${materials.length})
+            </button>
+            <button class="btn ${activeTab === 'people' ? 'btn-primary' : 'btn-secondary'}" onclick="switchTab('people')" style="padding: 7px 16px; font-size: 13px;">
+              👥 People in Class (${(cls.studentIds || []).length + 1})
+            </button>
+          </div>
+        </div>
+
+        <!-- Subtab Content -->
+        <div id="tab-content-container">
+          ${activeTab === 'activities' ? renderActivitiesTab(cls, activities, submissions, currentUser) : ''}
+          ${activeTab === 'materials' ? renderMaterialsTab(cls, materials, currentUser) : ''}
+          ${activeTab === 'people' ? renderPeopleTab(cls, users) : ''}
+        </div>
+      `;
+    }
+
+    /* ---------------- Tab 1: Activities & Passing ---------------- */
+    function renderActivitiesTab(cls, activities, submissions, currentUser) {
+      const isStudent = currentUser.role === 'student';
+      const isProf = currentUser.role === 'professor';
+
+      return `
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+              <h2 style="font-size: 20px; font-weight: 700;">Subject Activities & Submissions</h2>
+              <p style="color: var(--text-muted); font-size: 13px;">
+                ${isStudent 
+                  ? 'Pass your written activities below. Each submission undergoes automatic AI analysis visible to both you and your professor.'
+                  : 'Publish activities, set deadlines, and grade student submissions with automated AI insight reports.'}
+              </p>
+            </div>
+            ${isProf ? `
+              <button class="btn btn-primary" onclick="TagaNav.openModal('publish-activity-modal')">
+                + Publish Activity
+              </button>
+            ` : ''}
+          </div>
+
+          ${activities.length === 0 ? `
+            <div class="card" style="text-align: center; padding: 40px;">
+              <p style="color: var(--text-muted); font-size: 14px;">No activities published for this class yet.</p>
+            </div>
+          ` : `
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              ${activities.map(act => {
+                const mySubmission = submissions.find(s => s.activityId === act.id && s.studentId === currentUser.id);
+                const allSubmissions = submissions.filter(s => s.activityId === act.id);
+
+                return `
+                  <div class="card" style="padding: 24px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 12px; flex-wrap: wrap;">
+                      <div>
+                        <span class="badge ${act.status === 'open' ? 'badge-human' : 'badge-ai'}" style="margin-bottom: 8px;">
+                          ${act.status === 'open' ? 'Open for Submission' : 'Closed'}
+                        </span>
+                        <h3 style="font-size: 18px; font-weight: 700; color: var(--text-main); margin-top: 4px;">
+                          ${act.title}
+                        </h3>
+                      </div>
+                      <div style="text-align: right;">
+                        <span style="font-size: 13px; font-weight: 700; color: var(--accent-purple);">${act.totalPoints} Points</span>
+                        <div style="font-size: 12px; color: var(--text-muted);">Due: ${act.dueDate}</div>
+                      </div>
+                    </div>
+
+                    <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+                      ${act.instructions}
+                    </p>
+
+                    ${isStudent ? `
+                      <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 14px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 12px;">
+                        <div>
+                          ${mySubmission ? `
+                            <span class="badge badge-human">Passed ✓</span>
+                            <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px;">
+                              Passed on ${new Date(mySubmission.submittedAt).toLocaleDateString()}
+                            </span>
+                            ${mySubmission.grade !== undefined && mySubmission.grade !== null ? `
+                              <span style="font-size: 12px; font-weight: 700; color: var(--accent-emerald); margin-left: 8px;">
+                                Grade: ${mySubmission.grade} / ${act.totalPoints}
+                              </span>
+                            ` : '<span style="font-size: 12px; color: var(--accent-amber); margin-left: 8px;">Awaiting Professor Grade</span>'}
+                          ` : '<span class="badge badge-pending">Not Yet Passed</span>'}
+                        </div>
+
+                        <div style="display: flex; gap: 10px;">
+                          ${mySubmission ? `
+                            <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="viewReviewReport('${mySubmission.id}')">
+                              View Automated Review (${mySubmission.automatedReview.overallAiScore}% AI)
+                            </button>
+                            <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="openPassModal('${act.id}', '${escapeHtml(act.title)}')">
+                              Re-Pass Activity
+                            </button>
+                          ` : `
+                            <button class="btn btn-primary" style="font-size: 12px; padding: 6px 16px;" onclick="openPassModal('${act.id}', '${escapeHtml(act.title)}')">
+                              Pass Activity Now →
+                            </button>
+                          `}
+                        </div>
+                      </div>
+                    ` : ''}
+
+                    ${isProf ? `
+                      <div style="padding-top: 14px; border-top: 1px solid var(--border-color); margin-top: 10px;">
+                        <div style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 10px;">
+                          Student Submissions (${allSubmissions.length})
+                        </div>
+                        ${allSubmissions.length === 0 ? `
+                          <div style="font-size: 12px; color: var(--text-muted);">No student has submitted work for this activity yet.</div>
+                        ` : `
+                          <div style="display: flex; flex-direction: column; gap: 8px;">
+                            ${allSubmissions.map(sub => {
+                              const score = sub.automatedReview ? sub.automatedReview.overallAiScore : 0;
+                              return `
+                                <div style="display: flex; justify-content: space-between; align-items: center; background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px 14px;">
+                                  <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 13px; font-weight: 600; color: var(--text-main);">${sub.studentName}</span>
+                                    <span class="badge ${score > 50 ? 'badge-ai' : 'badge-human'}" style="font-size: 10px;">
+                                      ${score}% AI Score
+                                    </span>
+                                    <span style="font-size: 11px; color: var(--text-muted);">${sub.wordCount || 120} words</span>
+                                  </div>
+
+                                  <div style="display: flex; align-items: center; gap: 8px;">
+                                    <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="viewReviewReport('${sub.id}')">
+                                      Inspect Review
+                                    </button>
+                                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 12px;" onclick="openGradeModal('${sub.id}')">
+                                      ${sub.grade !== undefined && sub.grade !== null ? `Graded: ${sub.grade}` : 'Grade 📝'}
+                                    </button>
+                                  </div>
+                                </div>
+                              `;
+                            }).join('')}
+                          </div>
+                        `}
+                      </div>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    /* ---------------- Tab 2: Class Materials ---------------- */
+    function renderMaterialsTab(cls, materials, currentUser) {
+      const isProf = currentUser.role === 'professor';
+
+      return `
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+              <h2 style="font-size: 20px; font-weight: 700;">Course Documents & Learning Materials</h2>
+              <p style="color: var(--text-muted); font-size: 13px;">Official syllabi, lecture presentations, manuals, and reference sheets.</p>
+            </div>
+            ${isProf ? `
+              <button class="btn btn-primary" onclick="TagaNav.openModal('add-material-modal')">
+                + Add Material
+              </button>
+            ` : ''}
+          </div>
+
+          ${materials.length === 0 ? `
+            <div class="card" style="text-align: center; padding: 40px;">
+              <p style="color: var(--text-muted); font-size: 14px;">No materials uploaded for this class yet.</p>
+            </div>
+          ` : `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+              ${materials.map(mat => `
+                <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+                  <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                      <span class="badge badge-human" style="font-size: 10px;">${mat.type}</span>
+                      <span style="font-size: 11px; color: var(--text-muted);">${mat.size || '2.4 MB'}</span>
+                    </div>
+                    <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+                      ${mat.title}
+                    </h3>
+                    <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 16px;">
+                      ${mat.description}
+                    </p>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid var(--border-color);">
+                    <span style="font-size: 11px; color: var(--text-muted);">Added ${new Date(mat.uploadedAt).toLocaleDateString()}</span>
+                    <button class="btn btn-secondary" style="font-size: 11px; padding: 5px 12px;" onclick="simulateDownload('${escapeHtml(mat.title)}')">
+                      Download 📥
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    /* ---------------- Tab 3: People in Class ---------------- */
+    function renderPeopleTab(cls, users) {
+      const studentIds = cls.studentIds || [];
+      const enrolledStudents = studentIds.map(id => users.find(u => u.id === id)).filter(Boolean);
+
+      return `
+        <div>
+          <div style="margin-bottom: 28px;">
+            <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 14px; color: var(--accent-purple);">Lead Faculty & Instructors</h2>
+            <div class="card" style="padding: 20px; display: flex; align-items: center; gap: 16px; max-width: 450px;">
+              <img src="${cls.professorAvatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'}" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--accent-purple);" />
+              <div>
+                <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">${cls.professorName}</h3>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Lead Instructor • College of Computer Studies</div>
+                <div style="font-size: 12px; color: var(--accent-purple); margin-top: 4px;">instructor@tagadetect.edu</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 14px;">Enrolled Students (${enrolledStudents.length})</h2>
+            ${enrolledStudents.length === 0 ? `
+              <div class="card" style="padding: 30px; text-align: center; color: var(--text-muted);">
+                No students enrolled in this section yet.
+              </div>
+            ` : `
+              <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
+                ${enrolledStudents.map(st => `
+                  <div class="card" style="padding: 16px; display: flex; align-items: center; gap: 12px;">
+                    <img src="${st.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}" style="width: 40px; height: 40px; border-radius: 50%;" />
+                    <div>
+                      <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main);">${st.name}</h4>
+                      <div style="font-size: 11px; color: var(--text-muted);">${st.email}</div>
+                      <span class="badge badge-human" style="font-size: 9px; padding: 2px 6px; margin-top: 4px;">Student</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    /* ---------------- Action Handlers ---------------- */
+    function openPassModal(actId, title) {
+      document.getElementById('pass-activity-id').value = actId;
+      document.getElementById('pass-modal-title').textContent = `Pass: ${title}`;
+      document.getElementById('pass-text-input').value = '';
+      document.getElementById('pass-word-count').textContent = '0';
+      TagaNav.openModal('pass-activity-modal');
+    }
+
+    function updatePassWordCount(val) {
+      const words = val.trim() ? val.trim().split(/\s+/).length : 0;
+      document.getElementById('pass-word-count').textContent = words;
+    }
+
+    function submitPassedActivity() {
+      const actId = document.getElementById('pass-activity-id').value;
+      const text = document.getElementById('pass-text-input').value.trim();
+
+      if (!text || text.length < 30) {
+        TagaNav.toast('Please write at least 30 characters for your submission.', 'warning');
+        return;
+      }
+
+      const currentUser = TagaNav.getCurrentUser();
+      const wordCount = text.split(/\s+/).length;
+
+      // Execute shuffled AI review engine
+      const automatedReview = generateSubmissionReview(text);
+
+      const submissions = TagaStore.get(STORAGE_KEYS.SUBMISSIONS, INITIAL_SUBMISSIONS);
+      const existingIdx = submissions.findIndex(s => s.activityId === actId && s.studentId === currentUser.id);
+
+      const newSub = {
+        id: `sub_${Date.now()}`,
+        activityId: actId,
+        studentId: currentUser.id,
+        studentName: currentUser.name,
+        submittedAt: new Date().toISOString(),
+        content: text,
+        wordCount: wordCount,
+        automatedReview: automatedReview,
+        grade: null,
+        professorFeedback: null
+      };
+
+      if (existingIdx >= 0) {
+        submissions[existingIdx] = newSub;
+      } else {
+        submissions.unshift(newSub);
+      }
+
+      TagaStore.set(STORAGE_KEYS.SUBMISSIONS, submissions);
+      TagaNav.closeModal('pass-activity-modal');
+      TagaNav.toast(`Activity successfully passed! AI Review: ${automatedReview.overallAiScore}% AI.`);
+      renderClassPage();
+    }
+
+    function submitPublishActivity() {
+      const title = document.getElementById('new-act-title').value.trim();
+      const due = document.getElementById('new-act-due').value || '2026-11-20';
+      const points = parseInt(document.getElementById('new-act-points').value) || 100;
+      const instructions = document.getElementById('new-act-instructions').value.trim();
+
+      if (!title) {
+        TagaNav.toast('Please provide an activity title.', 'warning');
+        return;
+      }
+
+      const activities = TagaStore.get(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
+      const newAct = {
+        id: `act_${Date.now()}`,
+        classId: activeClassId,
+        title: title,
+        dueDate: due,
+        totalPoints: points,
+        instructions: instructions || 'Complete the assignment prompt in clear, structured prose.',
+        status: 'open'
+      };
+
+      activities.unshift(newAct);
+      TagaStore.set(STORAGE_KEYS.ACTIVITIES, activities);
+      TagaNav.closeModal('publish-activity-modal');
+      TagaNav.toast(`Published activity "${title}"!`);
+      renderClassPage();
+    }
+
+    function submitAddMaterial() {
+      const title = document.getElementById('mat-title-input').value.trim();
+      const cat = document.getElementById('mat-category-input').value;
+      const type = document.getElementById('mat-type-input').value;
+      const desc = document.getElementById('mat-desc-input').value.trim();
+
+      if (!title) {
+        TagaNav.toast('Please provide a document title.', 'warning');
+        return;
+      }
+
+      const materials = TagaStore.get(STORAGE_KEYS.MATERIALS, INITIAL_MATERIALS);
+      const newMat = {
+        id: `mat_${Date.now()}`,
+        classId: activeClassId,
+        title: title,
+        category: cat,
+        type: type,
+        description: desc || 'Official course document.',
+        uploadedAt: new Date().toISOString(),
+        size: '1.8 MB'
+      };
+
+      materials.unshift(newMat);
+      TagaStore.set(STORAGE_KEYS.MATERIALS, materials);
+      TagaNav.closeModal('add-material-modal');
+      TagaNav.toast(`Material "${title}" added to class hub!`);
+      renderClassPage();
+    }
+
+    function viewReviewReport(subId) {
+      const submissions = TagaStore.get(STORAGE_KEYS.SUBMISSIONS, INITIAL_SUBMISSIONS);
+      const sub = submissions.find(s => s.id === subId);
+      if (!sub || !sub.automatedReview) return;
+
+      const rev = sub.automatedReview;
+      const body = document.getElementById('review-modal-body');
+      body.innerHTML = `
+        <div style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 18px; margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <span class="badge ${rev.overallAiScore > 50 ? 'badge-ai' : 'badge-human'}" style="font-size: 13px; padding: 6px 14px;">
+              ${rev.overallAiScore}% AI Probability
+            </span>
+            <span style="font-size: 13px; font-weight: 700; color: var(--text-main);">${rev.verdict}</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; color: var(--text-muted);">
+            <div>Perplexity Score: <strong style="color: var(--text-main);">${rev.perplexityScore || 75}</strong></div>
+            <div>Burstiness Score: <strong style="color: var(--text-main);">${rev.burstinessScore || 62}</strong></div>
+          </div>
+        </div>
+
+        <h4 style="font-size: 14px; font-weight: 700; margin-bottom: 8px;">Sentence Breakdown</h4>
+        <div style="display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto;">
+          ${(rev.sentenceBreakdown || []).map(s => `
+            <div style="padding: 8px 12px; border-radius: 6px; font-size: 13px; line-height: 1.4; background: ${s.label === 'ai' ? 'rgba(156, 107, 255, 0.12)' : (s.label === 'mixed' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(16, 185, 129, 0.12)')}; border-left: 3px solid ${s.label === 'ai' ? 'var(--accent-purple)' : (s.label === 'mixed' ? 'var(--accent-amber)' : 'var(--accent-emerald)')};">
+              ${s.text} <span style="font-size: 10px; opacity: 0.8; margin-left: 6px;">[${s.score}% AI]</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      TagaNav.openModal('review-modal');
+    }
+
+    function openGradeModal(subId) {
+      const submissions = TagaStore.get(STORAGE_KEYS.SUBMISSIONS, INITIAL_SUBMISSIONS);
+      const sub = submissions.find(s => s.id === subId);
+      if (!sub) return;
+
+      document.getElementById('grade-sub-id').value = sub.id;
+      document.getElementById('grade-modal-student-name').textContent = `Evaluating submission from ${sub.studentName}`;
+      document.getElementById('grade-submission-excerpt').textContent = sub.content;
+      document.getElementById('grade-score-input').value = sub.grade || 95;
+      document.getElementById('grade-feedback-input').value = sub.professorFeedback || '';
+
+      const score = sub.automatedReview ? sub.automatedReview.overallAiScore : 0;
+      document.getElementById('grade-ai-badge').innerHTML = `
+        <span class="badge ${score > 50 ? 'badge-ai' : 'badge-human'}">${score}% AI Probability</span>
+        <span style="font-size: 12px; color: var(--text-muted);">${sub.automatedReview ? sub.automatedReview.verdict : 'Review Ready'}</span>
+      `;
+
+      TagaNav.openModal('grade-modal');
+    }
+
+    function submitGrade() {
+      const subId = document.getElementById('grade-sub-id').value;
+      const score = parseInt(document.getElementById('grade-score-input').value);
+      const feedback = document.getElementById('grade-feedback-input').value.trim();
+
+      const submissions = TagaStore.get(STORAGE_KEYS.SUBMISSIONS, INITIAL_SUBMISSIONS);
+      const sub = submissions.find(s => s.id === subId);
+      if (sub) {
+        sub.grade = score;
+        sub.professorFeedback = feedback;
+        sub.gradedAt = new Date().toISOString();
+        TagaStore.set(STORAGE_KEYS.SUBMISSIONS, submissions);
+        TagaNav.closeModal('grade-modal');
+        TagaNav.toast(`Grade recorded for ${sub.studentName}!`);
+        renderClassPage();
+      }
+    }
+
+    function copyClassCode(code) {
+      navigator.clipboard.writeText(code);
+      TagaNav.toast(`Class Code "${code}" copied to clipboard!`);
+    }
+
+    function simulateDownload(name) {
+      TagaNav.toast(`Downloading "${name}"...`);
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

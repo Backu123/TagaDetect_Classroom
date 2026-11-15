@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Approvals & Audits - TagaDetect</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Shared Global Navbar Container -->
+  <div id="navbar-container"></div>
+
+  <!-- Main Container -->
+  <main class="container">
+    <div style="margin-bottom: 28px;">
+      <div class="hero-tag"><span>✦</span> ADMINISTRATIVE CONTROL CENTER</div>
+      <h1 style="font-size: 28px; font-weight: 800; color: var(--text-main); margin-top: 6px;">
+        Faculty Approvals & AI Integrity Audit
+      </h1>
+      <p style="color: var(--text-muted); font-size: 14px; max-width: 720px; margin-top: 4px;">
+        Verify professor registrations to authorize course section creation, and audit user feedback on AI heuristic detections.
+      </p>
+    </div>
+
+    <!-- Admin Access Guard / Role Switcher Banner -->
+    <div id="admin-guard-banner" style="display: none; background: rgba(156, 107, 255, 0.08); border: 1px solid var(--accent-purple); border-radius: var(--radius-md); padding: 18px 24px; margin-bottom: 28px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <span style="font-size: 28px;">🔐</span>
+          <div>
+            <h3 style="font-size: 15px; font-weight: 700; color: var(--text-main);">Viewing as Non-Admin</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+              You are currently viewing with another role. Switch to Admin Eleanor Sterling to test approving or rejecting pending professors.
+            </p>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="TagaNav.switchUser('usr_admin')">
+          Switch to Admin (Eleanor) 🛡️
+        </button>
+      </div>
+    </div>
+
+    <!-- Pending Professor Approvals Queue -->
+    <div class="card" style="padding: 26px; margin-bottom: 32px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+        <div>
+          <h2 style="font-size: 18px; font-weight: 700;">Pending Professor Account Registrations</h2>
+          <p style="font-size: 13px; color: var(--text-muted);">
+            Newly registered professors must be approved before they can establish class sections or grade submissions.
+          </p>
+        </div>
+        <span class="badge badge-pending" id="admin-queue-badge">0 Pending</span>
+      </div>
+
+      <div id="pending-professors-list" style="display: flex; flex-direction: column; gap: 12px;"></div>
+    </div>
+
+    <!-- AI Detector User Feedback Audit Log -->
+    <div class="card" style="padding: 26px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+        <div>
+          <h2 style="font-size: 18px; font-weight: 700;">User Feedback on Detection Accuracy</h2>
+          <p style="font-size: 13px; color: var(--text-muted);">
+            Submissions from students and professors reporting false positives, false negatives, and cadence ratings.
+          </p>
+        </div>
+      </div>
+
+      <div id="admin-feedback-table" style="display: flex; flex-direction: column; gap: 10px;"></div>
+    </div>
+  </main>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="data.js"></script>
+  <script src="ai-engine.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      TagaNav.renderNavbar('admin');
+      checkAdminRole();
+      renderPendingQueue();
+      renderFeedbackAudit();
+    });
+
+    function checkAdminRole() {
+      const user = TagaNav.getCurrentUser();
+      const banner = document.getElementById('admin-guard-banner');
+      if (user.role !== 'admin') {
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
+
+    function renderPendingQueue() {
+      const users = TagaStore.get(STORAGE_KEYS.USERS, INITIAL_USERS);
+      const pending = users.filter(u => u.role === 'professor' && u.status === 'pending');
+      const list = document.getElementById('pending-professors-list');
+      const badge = document.getElementById('admin-queue-badge');
+
+      badge.textContent = `${pending.length} Pending`;
+
+      if (pending.length === 0) {
+        list.innerHTML = `
+          <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 14px;">
+            ✓ All faculty registrations have been processed. No pending requests.
+          </div>
+        `;
+        return;
+      }
+
+      list.innerHTML = pending.map(prof => `
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 16px 20px; flex-wrap: wrap; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <img src="${prof.avatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'}" style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--accent-amber);" />
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <strong style="font-size: 15px; color: var(--text-main);">${prof.name}</strong>
+                <span class="badge badge-pending" style="font-size: 10px;">Pending Verification</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                ${prof.email} • Requested: Professor Role
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 14px; border-color: var(--accent-rose); color: var(--accent-rose);" onclick="rejectProfessor('${prof.id}')">
+              Reject ✕
+            </button>
+            <button class="btn btn-primary" style="font-size: 12px; padding: 6px 16px;" onclick="approveProfessor('${prof.id}')">
+              Approve Account ✓
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function approveProfessor(userId) {
+      const users = TagaStore.get(STORAGE_KEYS.USERS, INITIAL_USERS);
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        user.status = 'active';
+        TagaStore.set(STORAGE_KEYS.USERS, users);
+        TagaNav.toast(`Approved ${user.name}! Faculty permissions now active.`);
+        renderPendingQueue();
+        TagaNav.renderNavbar('admin');
+      }
+    }
+
+    function rejectProfessor(userId) {
+      const users = TagaStore.get(STORAGE_KEYS.USERS, INITIAL_USERS);
+      const idx = users.findIndex(u => u.id === userId);
+      if (idx >= 0) {
+        const name = users[idx].name;
+        users.splice(idx, 1);
+        TagaStore.set(STORAGE_KEYS.USERS, users);
+        TagaNav.toast(`Registration request for ${name} rejected.`, 'warning');
+        renderPendingQueue();
+        TagaNav.renderNavbar('admin');
+      }
+    }
+
+    function renderFeedbackAudit() {
+      const feedback = TagaStore.get(STORAGE_KEYS.FEEDBACK, INITIAL_AI_FEEDBACK);
+      const table = document.getElementById('admin-feedback-table');
+
+      table.innerHTML = feedback.map(fb => `
+        <div style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <strong style="font-size: 14px; color: var(--text-main);">${fb.userName}</strong>
+              <span class="badge ${fb.userRole === 'professor' ? 'badge-ai' : 'badge-human'}" style="font-size: 10px;">
+                ${fb.userRole}
+              </span>
+              <span style="font-size: 12px; color: var(--text-muted);">Detected: ${fb.detectedScore}% AI</span>
+            </div>
+            <span class="badge ${fb.accuracyRating === 'highly_accurate' ? 'badge-human' : (fb.accuracyRating === 'partially_accurate' ? 'badge-pending' : 'badge-ai')}" style="font-size: 10px;">
+              ${fb.accuracyRating.replace('_', ' ').toUpperCase()}
+            </span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 4px;">"${fb.comment}"</p>
+          <div style="font-size: 11px; color: var(--text-muted);">Logged on ${new Date(fb.timestamp).toLocaleString()}</div>
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>

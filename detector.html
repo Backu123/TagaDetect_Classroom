@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Integrity Detector - TagaDetect</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Shared Global Navbar Container -->
+  <div id="navbar-container"></div>
+
+  <!-- Main Container -->
+  <main class="container">
+    <div style="margin-bottom: 24px;">
+      <div class="hero-tag"><span>✦</span> HEURISTIC INTEGRITY SUITE</div>
+      <h1 style="font-size: 28px; font-weight: 800; color: var(--text-main); margin-top: 6px;">
+        Stylistic Cadence & AI Detection Engine
+      </h1>
+      <p style="color: var(--text-muted); font-size: 14px; max-width: 680px; margin-top: 4px;">
+        Evaluates lexical predictability, perplexity invariants, and token shuffling variations to distinguish authentic human prose from synthetic language models.
+      </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 24px; align-items: start;">
+      <!-- Left: Text Input Area -->
+      <div class="card" style="padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <label class="form-label" style="margin-bottom: 0;">Analyze Text Passage</label>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="loadSampleText('ai')">Sample AI</button>
+            <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="loadSampleText('human')">Sample Human</button>
+            <button class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="loadSampleText('mixed')">Sample Mixed</button>
+          </div>
+        </div>
+
+        <textarea id="detector-text-input" class="form-textarea" style="min-height: 280px; font-size: 14px; line-height: 1.6;" placeholder="Paste an essay, article, assignment, or report here (at least 20 words recommended for optimal heuristic stability)..." oninput="updateCounters(this.value)"></textarea>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; gap: 16px; font-size: 12px; color: var(--text-muted);">
+            <span>Words: <strong id="cnt-words" style="color: var(--text-main);">0</strong></span>
+            <span>Characters: <strong id="cnt-chars" style="color: var(--text-main);">0</strong></span>
+            <span>Sentences: <strong id="cnt-sentences" style="color: var(--text-main);">0</strong></span>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" style="padding: 8px 14px; font-size: 13px;" onclick="clearInput()">Clear</button>
+            <button class="btn btn-primary" id="btn-analyze" style="padding: 8px 20px; font-size: 13px;" onclick="runDetection()">
+              Analyze Passage ⚡
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Real-time Analysis Gauge & Diagnostics -->
+      <div class="card" style="padding: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="font-size: 16px; font-weight: 700;">Diagnostic Results</h3>
+          <button class="btn btn-secondary" id="btn-open-feedback" style="font-size: 11px; padding: 4px 10px; display: none;" onclick="TagaNav.openModal('feedback-modal')">
+            Give Feedback 💬
+          </button>
+        </div>
+
+        <div id="results-placeholder" style="text-align: center; padding: 50px 20px; color: var(--text-muted);">
+          <div style="font-size: 40px; margin-bottom: 12px;">🔍</div>
+          <p style="font-size: 14px; font-weight: 600;">Awaiting Analysis</p>
+          <p style="font-size: 12px; margin-top: 4px;">Paste your content on the left and click "Analyze Passage" to generate stylistic metrics.</p>
+        </div>
+
+        <div id="results-display" style="display: none;">
+          <!-- Circular Dial Gauge -->
+          <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">
+            <div style="position: relative; width: 160px; height: 160px;">
+              <svg width="160" height="160" viewBox="0 0 160 160" style="transform: rotate(-90deg);">
+                <circle cx="80" cy="80" r="65" stroke="var(--gauge-track)" stroke-width="12" fill="none" />
+                <circle id="gauge-progress" cx="80" cy="80" r="65" stroke="var(--accent-purple)" stroke-width="12" stroke-linecap="round" fill="none" stroke-dasharray="408.4" stroke-dashoffset="408.4" style="transition: stroke-dashoffset 1s ease, stroke 0.3s ease;" />
+              </svg>
+              <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <span id="gauge-score-val" style="font-size: 34px; font-weight: 800; color: var(--text-main);">0%</span>
+                <span style="font-size: 10px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px;">AI Probability</span>
+              </div>
+            </div>
+
+            <div id="verdict-pill" class="badge badge-human" style="font-size: 13px; padding: 6px 16px; margin-top: 10px;">
+              Authentic Human Prose
+            </div>
+          </div>
+
+          <!-- Secondary Metrics -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+            <div style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 12px;">
+              <div style="font-size: 11px; color: var(--text-muted);">Perplexity Score</div>
+              <div id="metric-perplexity" style="font-size: 18px; font-weight: 700; color: var(--text-main); margin-top: 2px;">--</div>
+            </div>
+            <div style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px 12px;">
+              <div style="font-size: 11px; color: var(--text-muted);">Burstiness Variety</div>
+              <div id="metric-burstiness" style="font-size: 18px; font-weight: 700; color: var(--text-main); margin-top: 2px;">--</div>
+            </div>
+          </div>
+
+          <!-- Sentence-by-Sentence Breakdown -->
+          <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">Sentence Cadence Breakdown</h4>
+          <div id="sentence-breakdown-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- User Feedback Section -->
+    <div class="card" style="margin-top: 32px; padding: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div>
+          <h3 style="font-size: 16px; font-weight: 700;">Community & Faculty Feedback Stream</h3>
+          <p style="font-size: 13px; color: var(--text-muted);">Recent user ratings on AI detection precision, false positives, and cadence metrics.</p>
+        </div>
+        <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="TagaNav.openModal('feedback-modal')">
+          + Submit Result Feedback
+        </button>
+      </div>
+
+      <div id="feedback-stream-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+    </div>
+  </main>
+
+  <!-- User Feedback Modal -->
+  <div class="modal-backdrop" id="feedback-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">AI Detector Result Feedback</h2>
+          <p class="modal-subtitle">Help improve detection models by sharing evaluation feedback</p>
+        </div>
+        <button class="modal-close-btn" onclick="TagaNav.closeModal('feedback-modal')">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Accuracy Rating</label>
+        <select id="fb-rating" class="form-input">
+          <option value="highly_accurate">Highly Accurate (Reflects True Authorship)</option>
+          <option value="partially_accurate">Partially Accurate (Mixed Nuance)</option>
+          <option value="false_positive">False Positive (Human text flagged as AI)</option>
+          <option value="false_negative">False Negative (AI text undetected)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Feedback Category</label>
+        <select id="fb-type" class="form-input">
+          <option value="Accuracy Feedback">General Accuracy</option>
+          <option value="False Positive Flags">False Positive Correction</option>
+          <option value="False Negative Flags">Missed AI Usage</option>
+          <option value="Sentence Highlight Correction">Sentence Highlight Feedback</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Detailed Commentary</label>
+        <textarea id="fb-comment" class="form-textarea" placeholder="Explain which sentences or elements were misclassified..."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="TagaNav.closeModal('feedback-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitUserFeedback()">Submit Feedback</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="data.js"></script>
+  <script src="ai-engine.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    let currentScore = 0;
+
+    const SAMPLES = {
+      ai: `In today's rapidly evolving digital landscape, artificial intelligence plays an increasingly pivotal role across diverse educational environments. Furthermore, it is essential to recognize the multifaceted implications that arise from autonomous algorithmic workflows. By leveraging advanced natural language processing paradigms, educational software can dynamically adapt to user requirements. In conclusion, the integration of computational tools fosters pedagogical enhancement while maintaining rigorous systematic evaluation.`,
+      human: `I honestly didn't think I would enjoy Automata Theory this semester, but Professor Arida's whiteboard breakdown of NFAs vs DFAs really changed my perspective! Drawing out state transitions with branching paths felt just like walking through a sci-fi multiverse map. I definitely spent way too many hours debugging transition tables, but having it click during Friday lab was such a huge relief.`,
+      mixed: `In contemporary computational science, formal language theory establishes mathematical foundations for compiler construction and syntactic validation. However, when I first started learning regex in class, I kept getting lost in catastrophic backtracking loops! Modern lexers handle finite state transitions efficiently, but manually writing out the state table for our class project proved to be quite an adventure.`
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      TagaNav.renderNavbar('detector');
+      renderFeedbackStream();
+    });
+
+    function loadSampleText(type) {
+      const input = document.getElementById('detector-text-input');
+      input.value = SAMPLES[type] || '';
+      updateCounters(input.value);
+      TagaNav.toast(`Loaded Sample ${type.toUpperCase()} passage!`, 'info');
+      runDetection();
+    }
+
+    function clearInput() {
+      document.getElementById('detector-text-input').value = '';
+      updateCounters('');
+      document.getElementById('results-placeholder').style.display = 'block';
+      document.getElementById('results-display').style.display = 'none';
+      document.getElementById('btn-open-feedback').style.display = 'none';
+    }
+
+    function updateCounters(val) {
+      const trimmed = val.trim();
+      const words = trimmed ? trimmed.split(/\s+/).length : 0;
+      const chars = val.length;
+      const sentences = trimmed ? (val.match(/[^.!?]+[.!?]+/g) || [trimmed]).length : 0;
+
+      document.getElementById('cnt-words').textContent = words;
+      document.getElementById('cnt-chars').textContent = chars;
+      document.getElementById('cnt-sentences').textContent = sentences;
+    }
+
+    function runDetection() {
+      const text = document.getElementById('detector-text-input').value.trim();
+      if (!text || text.length < 15) {
+        TagaNav.toast('Please enter at least 15 characters to run detection.', 'warning');
+        return;
+      }
+
+      const btn = document.getElementById('btn-analyze');
+      btn.textContent = 'Analyzing... ⏳';
+      btn.disabled = true;
+
+      setTimeout(() => {
+        const result = predictShuffle(text);
+        currentScore = result.overallAiScore;
+
+        document.getElementById('results-placeholder').style.display = 'none';
+        document.getElementById('results-display').style.display = 'block';
+        document.getElementById('btn-open-feedback').style.display = 'inline-flex';
+
+        // Animate circular gauge
+        const gauge = document.getElementById('gauge-progress');
+        const scoreVal = document.getElementById('gauge-score-val');
+        scoreVal.textContent = `${currentScore}%`;
+
+        const circumference = 408.4;
+        const offset = circumference - (currentScore / 100) * circumference;
+        gauge.style.strokeDashoffset = offset;
+
+        if (currentScore > 65) {
+          gauge.style.stroke = 'var(--accent-rose)';
+        } else if (currentScore > 35) {
+          gauge.style.stroke = 'var(--accent-amber)';
+        } else {
+          gauge.style.stroke = 'var(--accent-emerald)';
+        }
+
+        // Verdict pill
+        const verdictPill = document.getElementById('verdict-pill');
+        verdictPill.textContent = result.verdict;
+        verdictPill.className = `badge ${currentScore > 65 ? 'badge-ai' : (currentScore > 35 ? 'badge-pending' : 'badge-human')}`;
+
+        // Metrics
+        document.getElementById('metric-perplexity').textContent = `${result.perplexityScore || 78} / 100`;
+        document.getElementById('metric-burstiness').textContent = `${result.burstinessScore || 64} / 100`;
+
+        // Sentence cadence breakdown
+        const list = document.getElementById('sentence-breakdown-list');
+        list.innerHTML = (result.sentenceBreakdown || []).map(s => `
+          <div style="padding: 8px 12px; border-radius: 6px; font-size: 13px; line-height: 1.4; background: ${s.label === 'ai' ? 'rgba(244, 63, 94, 0.1)' : (s.label === 'mixed' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)')}; border-left: 3px solid ${s.label === 'ai' ? 'var(--accent-rose)' : (s.label === 'mixed' ? 'var(--accent-amber)' : 'var(--accent-emerald)')};">
+            ${s.text} <span style="font-size: 10px; opacity: 0.8; margin-left: 6px;">[${s.score}% AI]</span>
+          </div>
+        `).join('');
+
+        btn.textContent = 'Analyze Passage ⚡';
+        btn.disabled = false;
+        TagaNav.toast(`Analysis complete: ${result.verdict}!`);
+      }, 400);
+    }
+
+    function submitUserFeedback() {
+      const rating = document.getElementById('fb-rating').value;
+      const type = document.getElementById('fb-type').value;
+      const comment = document.getElementById('fb-comment').value.trim();
+
+      if (!comment) {
+        TagaNav.toast('Please write a brief comment describing your feedback.', 'warning');
+        return;
+      }
+
+      const currentUser = TagaNav.getCurrentUser();
+      const feedbackList = TagaStore.get(STORAGE_KEYS.FEEDBACK, INITIAL_AI_FEEDBACK);
+
+      const newFeedback = {
+        id: `fb_${Date.now()}`,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userRole: currentUser.role,
+        timestamp: new Date().toISOString(),
+        detectedScore: currentScore,
+        accuracyRating: rating,
+        feedbackType: type,
+        comment: comment,
+        status: 'Audited'
+      };
+
+      feedbackList.unshift(newFeedback);
+      TagaStore.set(STORAGE_KEYS.FEEDBACK, feedbackList);
+
+      TagaNav.closeModal('feedback-modal');
+      TagaNav.toast('Thank you! Your feedback on the detection result was recorded.');
+      renderFeedbackStream();
+    }
+
+    function renderFeedbackStream() {
+      const list = TagaStore.get(STORAGE_KEYS.FEEDBACK, INITIAL_AI_FEEDBACK);
+      const container = document.getElementById('feedback-stream-list');
+      if (!container) return;
+
+      container.innerHTML = list.slice(0, 5).map(fb => `
+        <div style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong style="font-size: 13px; color: var(--text-main);">${fb.userName}</strong>
+              <span class="badge ${fb.userRole === 'professor' ? 'badge-ai' : 'badge-human'}" style="font-size: 9px; padding: 2px 6px;">
+                ${fb.userRole}
+              </span>
+              <span style="font-size: 11px; color: var(--text-muted);">• ${new Date(fb.timestamp).toLocaleDateString()}</span>
+            </div>
+            <span class="clean-subject-badge" style="font-size: 10px;">${fb.feedbackType}</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 0;">"${fb.comment}"</p>
+        </div>
+      `).join('');
+    }
+  </script>
+
+  <!-- FAQ nudge banner -->
+  <div style="max-width: 1140px; margin: 0 auto; padding: 0 24px 48px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; background: var(--card-bg); border: 1px solid var(--border-color); border-left: 4px solid var(--accent-purple); border-radius: 0 var(--radius-md) var(--radius-md) 0; padding: 14px 20px; flex-wrap: wrap;">
+      <div style="font-size: 13px; color: var(--text-muted);">
+        <strong style="color: var(--text-main);">Questions about your results?</strong>
+        Our FAQ explains what the AI score means, how the heatmap works, and what to do with the verdict.
+      </div>
+      <a href="faq.html" class="btn btn-secondary" style="font-size: 12px; padding: 7px 16px; text-decoration: none; white-space: nowrap; flex-shrink: 0;">
+        Read the FAQ →
+      </a>
+    </div>
+  </div>
+</body>
+</html>

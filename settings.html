@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - TagaDetect</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Shared Global Navbar Container -->
+  <div id="navbar-container"></div>
+
+  <!-- Main Container -->
+  <main class="container" style="max-width: 860px;">
+    <div style="margin-bottom: 28px;">
+      <h1 style="font-size: 26px; font-weight: 800; color: var(--text-main);">Account & Platform Settings</h1>
+      <p style="color: var(--text-muted); font-size: 14px; margin-top: 4px;">Manage your profile, theme mode, detection heuristics, and notifications</p>
+    </div>
+
+    <!-- Profile Overview Card -->
+    <div class="card" style="padding: 24px; margin-bottom: 24px;">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px;">Active Profile</h3>
+      <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+        <img id="set-profile-avatar" src="" style="width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--accent-purple); object-fit: cover;" />
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <h2 id="set-profile-name" style="font-size: 18px; font-weight: 700; color: var(--text-main);">User</h2>
+            <span id="set-profile-role" class="badge badge-human">STUDENT</span>
+          </div>
+          <div id="set-profile-email" style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">email@tagadetect.edu</div>
+          <div style="font-size: 12px; color: var(--accent-purple); margin-top: 4px;">College of Computer Studies • UST / DLSU Partner Network</div>
+        </div>
+        <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="TagaNav.toast('Profile details updated (demo mode).')">
+          Edit Profile
+        </button>
+      </div>
+    </div>
+
+    <!-- Appearance & Theme Card -->
+    <div class="card" style="padding: 24px; margin-bottom: 24px;">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">Visual Appearance & Theme</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Customize the interface color scheme</p>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div id="theme-card-dark" style="background: #12101d; border: 2px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; cursor: pointer;" onclick="setThemeDirect('dark')">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="color: #ffffff; font-size: 14px;">🌙 Dark Mode (Default)</strong>
+            <span id="check-dark" style="color: var(--accent-purple); font-weight: 700;">✓</span>
+          </div>
+          <p style="font-size: 12px; color: #b0aec4; margin-bottom: 0;">Rich purple accents with deep midnight slate canvas.</p>
+        </div>
+
+        <div id="theme-card-light" style="background: #ffffff; border: 2px solid var(--border-color); border-radius: var(--radius-md); padding: 16px; cursor: pointer;" onclick="setThemeDirect('light')">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="color: #1e1b2e; font-size: 14px;">☀️ Light Mode</strong>
+            <span id="check-light" style="color: var(--accent-purple); font-weight: 700; display: none;">✓</span>
+          </div>
+          <p style="font-size: 12px; color: #6b6880; margin-bottom: 0;">High contrast clean white canvas with crisp borders.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Detection Sensitivity -->
+    <div class="card" style="padding: 24px; margin-bottom: 24px;">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">AI Detection Engine Preferences</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Configure heuristic tolerance and token cadence parameters</p>
+
+      <div class="form-group">
+        <label class="form-label">Heuristic Sensitivity</label>
+        <select class="form-input" id="set-sensitivity" onchange="saveDetectorPref()">
+          <option value="conservative">Conservative (Minimizes false positives, higher human tolerance)</option>
+          <option value="balanced" selected>Balanced (Standard academic calibration)</option>
+          <option value="strict">Strict (High sensitivity for advanced LLM watermarks)</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">Shuffling & Predictability Model</label>
+        <select class="form-input" id="set-shuffle-mode" onchange="saveDetectorPref()">
+          <option value="pseudo_shuffled" selected>Pseudo-Shuffled Token Permutation (Fast Heuristic)</option>
+          <option value="ngram_burstiness">N-Gram Burstiness & Perplexity Analysis</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Reset Demo Data -->
+    <div class="card" style="padding: 24px; border: 1px solid var(--accent-rose); background: rgba(244, 63, 94, 0.04);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div>
+          <h3 style="font-size: 15px; font-weight: 700; color: var(--accent-rose);">Reset Application Data</h3>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Restore all classes, founders, activities, and initial users to factory seed defaults.</p>
+        </div>
+        <button class="btn btn-secondary" style="border-color: var(--accent-rose); color: var(--accent-rose); font-size: 13px; padding: 8px 16px;" onclick="confirmResetData()">
+          Reset to Factory Defaults ↺
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="data.js"></script>
+  <script src="ai-engine.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      TagaNav.renderNavbar('settings');
+      loadSettings();
+    });
+
+    function loadSettings() {
+      const user = TagaNav.getCurrentUser();
+      document.getElementById('set-profile-name').textContent = user.name;
+      document.getElementById('set-profile-email').textContent = user.email;
+      document.getElementById('set-profile-avatar').src = user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+
+      const roleBadge = document.getElementById('set-profile-role');
+      roleBadge.textContent = user.role.toUpperCase();
+      roleBadge.className = `badge ${user.role === 'student' ? 'badge-human' : 'badge-ai'}`;
+
+      updateThemeUI(TagaNav.getCurrentTheme());
+    }
+
+    function setThemeDirect(theme) {
+      TagaNav.setTheme(theme);
+      updateThemeUI(theme);
+      TagaNav.toast(`Applied ${theme === 'dark' ? 'Dark' : 'Light'} Theme!`);
+    }
+
+    function updateThemeUI(theme) {
+      document.getElementById('check-dark').style.display = theme === 'dark' ? 'inline' : 'none';
+      document.getElementById('check-light').style.display = theme === 'light' ? 'inline' : 'none';
+      document.getElementById('theme-card-dark').style.borderColor = theme === 'dark' ? 'var(--accent-purple)' : 'var(--border-color)';
+      document.getElementById('theme-card-light').style.borderColor = theme === 'light' ? 'var(--accent-purple)' : 'var(--border-color)';
+    }
+
+    function saveDetectorPref() {
+      TagaNav.toast('Detector heuristic settings saved!');
+    }
+
+    function confirmResetData() {
+      if (confirm('Are you sure you want to reset all data back to factory defaults?')) {
+        TagaStore.resetToDefault();
+      }
+    }
+  </script>
+</body>
+</html>

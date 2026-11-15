@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TagaDetect - Classes & Integrity Platform</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Shared Global Navbar Container -->
+  <div id="navbar-container"></div>
+
+  <!-- Main Container -->
+  <main class="container">
+    <div id="home-content"></div>
+  </main>
+
+  <!-- Enroll Class Modal (Students Only) -->
+  <div class="modal-backdrop" id="enroll-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Join Class Section</h2>
+          <p class="modal-subtitle">Enter the 6-character course code provided by your instructor</p>
+        </div>
+        <button class="modal-close-btn" onclick="TagaNav.closeModal('enroll-modal')">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Class Code</label>
+        <input type="text" id="enroll-code-input" class="form-input" placeholder="e.g. AUT-305, NET-310, IS-306" maxlength="10" style="text-transform: uppercase; font-family: monospace; font-size: 16px; letter-spacing: 1px;" />
+        <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+          Available demo codes: <code style="color: var(--accent-purple);">AUT-305</code>, <code style="color: var(--accent-purple);">NET-310</code>, <code style="color: var(--accent-purple);">IS-306</code>, <code style="color: var(--accent-purple);">PM-309</code>
+        </div>
+      </div>
+
+      <div style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 24px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Student Enrollment Notice</div>
+        <div style="font-size: 12px; color: var(--text-muted);">
+          Only students can join class sections. Once enrolled, you can access materials, view assignments, and pass text activities with automated AI reviews.
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="TagaNav.closeModal('enroll-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitEnrollClass()">Confirm Enrollment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Class Modal (Professors Only) -->
+  <div class="modal-backdrop" id="create-class-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">Create Class Section</h2>
+          <p class="modal-subtitle">Establish a new academic course section and generate an enrollment code</p>
+        </div>
+        <button class="modal-close-btn" onclick="TagaNav.closeModal('create-class-modal')">✕</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Subject Title</label>
+        <input type="text" id="create-class-title" class="form-input" placeholder="e.g. CMSC 315 - Operating Systems Architecture" />
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="form-group">
+          <label class="form-label">Section Tag</label>
+          <input type="text" id="create-class-section" class="form-input" placeholder="e.g. BSCS 3IS-1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Room / Delivery</label>
+          <input type="text" id="create-class-room" class="form-input" placeholder="e.g. Lab 402 or Online" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Schedule</label>
+        <input type="text" id="create-class-schedule" class="form-input" placeholder="e.g. Mon / Wed 1:00 PM - 2:30 PM" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Course Description & Goals</label>
+        <textarea id="create-class-desc" class="form-textarea" placeholder="Outline expectations, syllabus focus, and integrity rubrics..."></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="TagaNav.closeModal('create-class-modal')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitCreateClass()">Create & Publish Section</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="data.js"></script>
+  <script src="ai-engine.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      TagaNav.renderNavbar('home');
+      renderDashboard();
+    });
+
+    function renderDashboard() {
+      const user = TagaNav.getCurrentUser();
+      const isStudent = user.role === 'student';
+      const isProf = user.role === 'professor';
+      const isAdmin = user.role === 'admin';
+      const isPendingProf = isProf && user.status === 'pending';
+
+      const classes = TagaStore.get(STORAGE_KEYS.CLASSES, INITIAL_CLASSES);
+      const activities = TagaStore.get(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
+      const materials = TagaStore.get(STORAGE_KEYS.MATERIALS, INITIAL_MATERIALS);
+
+      let visibleClasses = [];
+      if (isStudent) {
+        visibleClasses = classes.filter(cls => cls.studentIds && cls.studentIds.includes(user.id));
+      } else if (isProf) {
+        visibleClasses = classes.filter(cls => cls.professorId === user.id);
+      } else {
+        visibleClasses = classes;
+      }
+
+      const container = document.getElementById('home-content');
+      container.innerHTML = `
+        ${isPendingProf ? `
+          <div class="card" style="border: 1px solid var(--accent-rose); background: rgba(244, 63, 94, 0.08); margin-bottom: 28px; padding: 18px 22px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <span style="font-size: 26px;">⏳</span>
+                <div>
+                  <h3 style="font-size: 15px; font-weight: 700; color: var(--accent-rose);">Professor Account Pending Administrative Verification</h3>
+                  <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+                    Your account is currently in the Admin Approval Queue. An administrator must verify your faculty credentials before class creation is unlocked.
+                  </p>
+                </div>
+              </div>
+              <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="TagaNav.switchUser('usr_admin')">
+                Switch to Admin to Approve
+              </button>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Clean SaaS Hero -->
+        <section class="hero-clean">
+          <div>
+            <div class="hero-tag">
+              <span>✦</span> ${isStudent ? 'STUDENT PORTAL' : (isProf ? 'PROFESSOR PORTAL' : 'ADMINISTRATOR PORTAL')}
+            </div>
+            <h1 class="hero-title">
+              ${isStudent 
+                ? 'Join classes, explore materials, and pass activities.'
+                : (isProf 
+                    ? 'Create classes, upload materials, and grade activities.' 
+                    : 'Institutional integrity, faculty verification, and course oversight.')}
+            </h1>
+            <p class="hero-subtitle">
+              ${isStudent
+                ? 'Students exclusively join class sections using instructor-provided codes. Passed text activities are evaluated automatically upon submission with transparent AI diagnostics.'
+                : (isProf
+                    ? 'Professors are the exclusive creators of course sections. Generate access codes, share lecture slides, and grade student submissions with automated AI insight reports.'
+                    : 'Monitor institutional classes, audit pending professor account requests, and evaluate user feedback on detection accuracy.')}
+            </p>
+            <div class="hero-cta-group">
+              ${isStudent ? `
+                <button class="btn btn-primary" onclick="TagaNav.openModal('enroll-modal')">
+                  + Join Class with Code
+                </button>
+                <a href="detector.html" class="btn btn-secondary" style="text-decoration: none;">
+                  Open AI Detector
+                </a>
+              ` : ''}
+
+              ${isProf ? `
+                <button class="btn btn-primary" onclick="TagaNav.openModal('create-class-modal')" ${isPendingProf ? 'disabled title="Account pending approval"' : ''}>
+                  + Create New Class Section
+                </button>
+                <a href="detector.html" class="btn btn-secondary" style="text-decoration: none;">
+                  Open AI Detector
+                </a>
+              ` : ''}
+
+              ${isAdmin ? `
+                <a href="admin.html" class="btn btn-primary" style="text-decoration: none;">
+                  Inspect Pending Approvals Queue
+                </a>
+                <a href="detector.html" class="btn btn-secondary" style="text-decoration: none;">
+                  Open AI Detector
+                </a>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="hero-preview-wrapper">
+            <div class="hero-float-card">
+              <div class="hero-stat-badge">
+                <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">
+                  ${isStudent ? 'Enrolled Classes' : (isProf ? 'Classes Handled' : 'Total Active Classes')}
+                </span>
+                <span class="badge ${isStudent ? 'badge-human' : 'badge-ai'}">
+                  ${isStudent ? 'Enrolled' : 'Faculty'}
+                </span>
+              </div>
+              <div class="hero-stat-num">${visibleClasses.length}</div>
+              <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                ${isStudent ? 'Select any class below to view its dedicated page, activities, materials, and people.' : 'Click any class below to manage materials, publish activities, and grade submissions.'}
+              </div>
+            </div>
+
+            <div class="hero-float-card" style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <strong style="font-size: 14px; color: var(--text-main);">Dedicated Class Pages</strong>
+                <div style="font-size: 12px; color: var(--text-muted);">
+                  Dedicated view for Activities, Materials, and People
+                </div>
+              </div>
+              <span class="badge badge-ai" style="font-size: 11px; padding: 4px 10px;">Full Hub</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section Header with Search and Action -->
+        <div class="section-header-clean">
+          <div>
+            <h2>${isStudent ? 'My Enrolled Classes' : (isProf ? 'Classes Handled by You' : 'All Institutional Classes')}</h2>
+            <p>Select any class card to open its dedicated page with activities, materials, and class roster</p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <input type="text" id="class-search-input" class="form-input" placeholder="Search subject or code..." oninput="filterClassGrid(this.value)" style="width: 220px; padding: 7px 12px; font-size: 13px;" />
+            ${isStudent ? `
+              <button class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;" onclick="TagaNav.openModal('enroll-modal')">
+                + Join Class
+              </button>
+            ` : ''}
+
+            ${isProf ? `
+              <button class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;" onclick="TagaNav.openModal('create-class-modal')" ${isPendingProf ? 'disabled' : ''}>
+                + Create Class
+              </button>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- 3-Column Clean Classes Grid -->
+        <div id="classes-grid-container">
+          ${renderClassCards(visibleClasses, activities, materials)}
+        </div>
+      `;
+    }
+
+    function renderClassCards(classesList, activities, materials) {
+      if (classesList.length === 0) {
+        const user = TagaNav.getCurrentUser();
+        const isStudent = user.role === 'student';
+        return `
+          <div class="card" style="text-align: center; padding: 48px 24px;">
+            <div style="font-size: 38px; margin-bottom: 12px;">${isStudent ? '🎒' : '📚'}</div>
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">
+              ${isStudent ? 'No Enrolled Classes Found' : 'No Handled Classes Found'}
+            </h3>
+            <p style="color: var(--text-muted); font-size: 14px; max-width: 480px; margin: 0 auto 20px;">
+              ${isStudent 
+                ? 'Click "+ Join Class" and enter an instructor-provided code (such as AUT-305 or NET-310) to access your class page.' 
+                : 'Click "+ Create Class" to establish a new section and generate a 6-character code for your students.'}
+            </p>
+            ${isStudent ? `
+              <button class="btn btn-primary" onclick="TagaNav.openModal('enroll-modal')">+ Join a Class Section</button>
+            ` : `
+              <button class="btn btn-primary" onclick="TagaNav.openModal('create-class-modal')">+ Create Class Section</button>
+            `}
+          </div>
+        `;
+      }
+
+      return `
+        <div class="classes-clean-grid">
+          ${classesList.map(cls => {
+            const classActs = activities.filter(a => a.classId === cls.id);
+            const classMats = materials.filter(m => m.classId === cls.id);
+
+            return `
+              <div class="clean-class-card" onclick="window.location.href='class-detail.html?id=${cls.id}'">
+                <div>
+                  <div class="clean-card-tag-row">
+                    <span class="clean-subject-badge">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                      CODE: ${cls.code}
+                    </span>
+                    <span class="clean-section-tag">${cls.section}</span>
+                  </div>
+
+                  <h3 class="clean-class-title">${cls.subjectName}</h3>
+
+                  <div class="clean-class-instructor">
+                    <img src="${cls.professorAvatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'}" class="clean-instructor-img" alt="${cls.professorName}" />
+                    <div>
+                      <div class="clean-instructor-name">${cls.professorName}</div>
+                      <div class="clean-instructor-sub">${cls.room} • ${cls.schedule}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="clean-card-bottom">
+                  <div class="clean-activity-pill">
+                    <span class="clean-meta-tag">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                      ${classActs.length} Activities
+                    </span>
+                    <span class="clean-meta-tag">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                      ${classMats.length} Materials
+                    </span>
+                  </div>
+                  <span class="clean-action-link">
+                    Open Class
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function filterClassGrid(query) {
+      const q = query.trim().toLowerCase();
+      const user = TagaNav.getCurrentUser();
+      const classes = TagaStore.get(STORAGE_KEYS.CLASSES, INITIAL_CLASSES);
+      const activities = TagaStore.get(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
+      const materials = TagaStore.get(STORAGE_KEYS.MATERIALS, INITIAL_MATERIALS);
+
+      let visible = [];
+      if (user.role === 'student') {
+        visible = classes.filter(cls => cls.studentIds && cls.studentIds.includes(user.id));
+      } else if (user.role === 'professor') {
+        visible = classes.filter(cls => cls.professorId === user.id);
+      } else {
+        visible = classes;
+      }
+
+      if (q) {
+        visible = visible.filter(c => 
+          c.subjectName.toLowerCase().includes(q) || 
+          c.code.toLowerCase().includes(q) || 
+          c.section.toLowerCase().includes(q)
+        );
+      }
+
+      document.getElementById('classes-grid-container').innerHTML = renderClassCards(visible, activities, materials);
+    }
+
+    function submitEnrollClass() {
+      const user = TagaNav.getCurrentUser();
+      if (user.role !== 'student') {
+        TagaNav.toast('Only students can join class sections.', 'warning');
+        return;
+      }
+
+      const input = document.getElementById('enroll-code-input');
+      const code = input ? input.value.trim().toUpperCase() : '';
+      if (!code) {
+        TagaNav.toast('Please enter a 6-character class code.', 'warning');
+        return;
+      }
+
+      const classes = TagaStore.get(STORAGE_KEYS.CLASSES, INITIAL_CLASSES);
+      const targetClass = classes.find(c => c.code.toUpperCase() === code);
+
+      if (!targetClass) {
+        TagaNav.toast(`Class code "${code}" not found. Try AUT-305, NET-310, or IS-306`, 'danger');
+        return;
+      }
+
+      if (targetClass.studentIds && targetClass.studentIds.includes(user.id)) {
+        TagaNav.toast(`You are already enrolled in ${targetClass.subjectName}!`, 'info');
+        TagaNav.closeModal('enroll-modal');
+        return;
+      }
+
+      if (!targetClass.studentIds) targetClass.studentIds = [];
+      targetClass.studentIds.push(user.id);
+
+      TagaStore.set(STORAGE_KEYS.CLASSES, classes);
+      TagaNav.closeModal('enroll-modal');
+      TagaNav.toast(`Successfully joined ${targetClass.subjectName} (${targetClass.section})!`);
+      renderDashboard();
+    }
+
+    function submitCreateClass() {
+      const user = TagaNav.getCurrentUser();
+      if (user.role !== 'professor' && user.role !== 'admin') {
+        TagaNav.toast('Only professors can create new class sections.', 'warning');
+        return;
+      }
+
+      if (user.role === 'professor' && user.status === 'pending') {
+        TagaNav.toast('Your professor account is pending admin approval.', 'warning');
+        return;
+      }
+
+      const title = document.getElementById('create-class-title').value.trim();
+      const section = document.getElementById('create-class-section').value.trim() || 'BSCS 3IS-1';
+      const room = document.getElementById('create-class-room').value.trim() || 'Lab 305';
+      const schedule = document.getElementById('create-class-schedule').value.trim() || 'Mon/Wed 1:00 PM - 2:30 PM';
+      const desc = document.getElementById('create-class-desc').value.trim();
+
+      if (!title) {
+        TagaNav.toast('Please provide a subject title.', 'warning');
+        return;
+      }
+
+      const prefix = title.replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase() || 'CLS';
+      const randNum = Math.floor(100 + Math.random() * 899);
+      const generatedCode = `${prefix}-${randNum}`;
+
+      const classes = TagaStore.get(STORAGE_KEYS.CLASSES, INITIAL_CLASSES);
+      const newClass = {
+        id: `cls_${Date.now()}`,
+        code: generatedCode,
+        subjectName: title,
+        section: section,
+        professorId: user.id,
+        professorName: user.name,
+        professorAvatar: user.avatar,
+        room: room,
+        schedule: schedule,
+        description: desc || 'Academic course section exploring foundational principles and applied projects.',
+        studentIds: ['usr_student_1', 'usr_student_2']
+      };
+
+      classes.unshift(newClass);
+      TagaStore.set(STORAGE_KEYS.CLASSES, classes);
+      TagaNav.closeModal('create-class-modal');
+      TagaNav.toast(`Created section ${title}! Enrollment code: ${generatedCode}`);
+      renderDashboard();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+/* ─── Page shell ────────────────────────────────────────────────────────── */
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 20px 64px;
+}
+
+/* ─── Typography ────────────────────────────────────────────────────────── */
+.h1 {
+  font-size: 2.25rem;
+  line-height: 1.2;
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: var(--text-main, #ece9f7);
+}
+
+.lede {
+  color: var(--text-muted, #a8a3be);
+  margin: 0 0 28px;
+  max-width: 62ch;
+}
+
+/* ─── Search ─────────────────────────────────────────────────────────── */
+.searchLabel {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 14px 16px;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--text-main, #ece9f7);
+  background: var(--card-bg, #1a1729);
+  border: 1px solid var(--border-color, #2c2742);
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted, #a8a3be);
+}
+
+.searchInput:focus {
+  border-color: var(--accent-purple, #9d6bff);
+}
+
+/* ─── Filter pills ───────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.filterBtn {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text-main, #ece9f7);
+  background: var(--card-bg, #1a1729);
+  border: 1px solid var(--border-color, #2c2742);
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.filterBtn:hover {
+  background: var(--card-inner, #211d34);
+}
+
+.filterBtnActive {
+  background: var(--accent-purple, #9d6bff);
+  border-color: var(--accent-purple, #9d6bff);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* ─── Status line ────────────────────────────────────────────────────── */
+.status {
+  color: var(--text-muted, #a8a3be);
+  font-size: 0.9rem;
+  min-height: 1.5em;
+  margin: 8px 0 24px;
+}
+
+/* ─── Group section ──────────────────────────────────────────────────── */
+.group {
+  margin-bottom: 36px;
+}
+
+.groupHeading {
+  font-size: 1.3rem;
+  margin: 0 0 4px;
+  font-weight: 650;
+  color: var(--text-main, #ece9f7);
+}
+
+.groupAbout {
+  color: var(--text-muted, #a8a3be);
+  margin: 0 0 14px;
+  font-size: 0.95rem;
+}
+
+/* ─── FAQ accordion item ─────────────────────────────────────────────── */
+.faqItem {
+  background: var(--card-bg, #1a1729);
+  border: 1px solid var(--border-color, #2c2742);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.faqItemOpen {
+  border-color: var(--accent-purple, #9d6bff);
+}
+
+.summary {
+  all: unset;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+  padding: 16px 20px;
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-main, #ece9f7);
+  border-radius: 12px;
+  transition: background 0.15s;
+  gap: 16px;
+}
+
+.summary:hover {
+  background: var(--card-inner, #211d34);
+}
+
+.summary:focus-visible {
+  outline: 3px solid var(--accent-purple, #9d6bff);
+  outline-offset: -3px;
+}
+
+/* Chevron icon */
+.chevron {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--accent-purple, #9d6bff);
+  border-bottom: 2px solid var(--accent-purple, #9d6bff);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(-135deg) translateY(-2px);
+}
+
+/* ─── Answer ─────────────────────────────────────────────────────────── */
+.answer {
+  padding: 0 20px 18px;
+  max-width: 70ch;
+  color: var(--text-main, #ece9f7);
+  line-height: 1.65;
+}
+
+.answer p {
+  margin: 0 0 12px;
+}
+
+.answer p:last-child {
+  margin-bottom: 0;
+}
+
+.answer ul {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+
+.answer li {
+  margin-bottom: 6px;
+}
+
+/* ─── Score scale ────────────────────────────────────────────────────── */
+.scale {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 4px 0 14px;
+  max-width: 520px;
+}
+
+.scale > div {
+  border-top: 5px solid var(--border-color, #2c2742);
+  padding-top: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.zGood { border-top-color: #43b36a !important; }
+.zMid  { border-top-color: #e6a93a !important; }
+.zBad  { border-top-color: #e5586b !important; }
+
+/* ─── Empty state ────────────────────────────────────────────────────── */
+.empty {
+  background: var(--card-bg, #1a1729);
+  border: 1px dashed var(--border-color, #2c2742);
+  border-radius: 12px;
+  padding: 24px;
+  color: var(--text-muted, #a8a3be);
+}
+
+/* ─── Footer note ────────────────────────────────────────────────────── */
+.note {
+  margin-top: 12px;
+  padding: 16px 20px;
+  border-left: 4px solid var(--accent-purple, #9d6bff);
+  background: var(--card-bg, #1a1729);
+  border-radius: 0 12px 12px 0;
+  color: var(--text-muted, #a8a3be);
+  line-height: 1.65;
+}
+
+.note strong {
+  color: var(--text-main, #ece9f7);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .h1 { font-size: 1.7rem; }
+  .scale { grid-template-columns: 1fr; }
+}

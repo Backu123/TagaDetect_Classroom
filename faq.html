@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ - TagaDetect</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── FAQ-specific styles ─────────────────────────────────────── */
+
+    .faq-hero {
+      text-align: center;
+      max-width: 680px;
+      margin: 0 auto 44px;
+    }
+    .faq-hero h1 {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-top: 10px;
+      letter-spacing: -0.5px;
+    }
+    .faq-hero p {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-top: 10px;
+      line-height: 1.65;
+    }
+
+    /* Search */
+    .faq-search-wrap {
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .faq-search-wrap svg {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .faq-search {
+      width: 100%;
+      padding: 13px 16px 13px 44px;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text-main);
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .faq-search::placeholder { color: var(--text-muted); }
+    .faq-search:focus { border-color: var(--accent-purple); }
+
+    /* Filter pills */
+    .faq-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .faq-pill {
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: var(--radius-pill);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .faq-pill:hover { background: var(--card-inner); color: var(--text-main); }
+    .faq-pill.active {
+      background: var(--accent-purple);
+      border-color: var(--accent-purple);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* Status */
+    .faq-status {
+      font-size: 12px;
+      color: var(--text-muted);
+      min-height: 1.4em;
+      margin: 6px 0 28px;
+    }
+
+    /* Group */
+    .faq-group { margin-bottom: 40px; }
+    .faq-group-heading {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 0 0 4px;
+    }
+    .faq-group-about {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin: 0 0 14px;
+    }
+
+    /* Accordion item */
+    .faq-item {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin-bottom: 8px;
+      overflow: hidden;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .faq-item.open {
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 0 1px var(--accent-glow);
+    }
+
+    .faq-trigger {
+      all: unset;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 16px 20px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      cursor: pointer;
+      gap: 16px;
+      transition: background 0.15s;
+    }
+    .faq-trigger:hover { background: var(--card-inner); }
+    .faq-trigger:focus-visible {
+      outline: 2px solid var(--accent-purple);
+      outline-offset: -2px;
+    }
+
+    /* Chevron */
+    .faq-chevron {
+      flex-shrink: 0;
+      width: 8px;
+      height: 8px;
+      border-right: 2px solid var(--accent-purple);
+      border-bottom: 2px solid var(--accent-purple);
+      transform: rotate(45deg) translateY(-2px);
+      transition: transform 0.2s ease;
+    }
+    .faq-item.open .faq-chevron {
+      transform: rotate(-135deg) translateY(2px);
+    }
+
+    /* Answer body */
+    .faq-body {
+      display: none;
+      padding: 0 20px 18px;
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.7;
+      max-width: 70ch;
+    }
+    .faq-item.open .faq-body { display: block; }
+    .faq-body p { margin: 0 0 10px; }
+    .faq-body p:last-child { margin-bottom: 0; }
+    .faq-body ul { margin: 0 0 10px; padding-left: 20px; }
+    .faq-body li { margin-bottom: 5px; }
+    .faq-body strong { color: var(--text-main); font-weight: 600; }
+
+    /* Verdict scale */
+    .verdict-scale {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 10px 0 14px;
+      max-width: 500px;
+    }
+    .verdict-scale > div {
+      border-top: 4px solid var(--border-color);
+      padding-top: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .vs-good { border-top-color: var(--accent-emerald) !important; }
+    .vs-mid  { border-top-color: var(--accent-amber)   !important; }
+    .vs-bad  { border-top-color: var(--accent-rose)    !important; }
+
+    /* Empty state */
+    .faq-empty {
+      background: var(--card-bg);
+      border: 1px dashed var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 28px 24px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* Footer note */
+    .faq-note {
+      margin-top: 16px;
+      padding: 16px 20px;
+      border-left: 4px solid var(--accent-purple);
+      background: var(--card-bg);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+    .faq-note strong { color: var(--text-main); }
+
+    @media (max-width: 560px) {
+      .faq-hero h1 { font-size: 24px; }
+      .verdict-scale { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Shared Navbar -->
+  <div id="navbar-container"></div>
+
+  <!-- Toast -->
+  <div id="toast-container"></div>
+
+  <main class="container">
+
+    <!-- Hero -->
+    <section class="faq-hero">
+      <div class="hero-tag"><span>✦</span> HELP CENTER</div>
+      <h1>Frequently Asked Questions</h1>
+      <p>Answers about checking text, reading your results, and how your writing is handled.</p>
+    </section>
+
+    <!-- Search -->
+    <div class="faq-search-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input
+        type="search"
+        id="faq-search-input"
+        class="faq-search"
+        placeholder='Search questions, e.g. "short text" or "privacy"…'
+        autocomplete="off"
+        oninput="faqApply()"
+      >
+    </div>
+
+    <!-- Filter pills -->
+    <div class="faq-filters" id="faq-filters">
+      <button class="faq-pill active" data-cat="all"      onclick="faqSetCat(this)">All</button>
+      <button class="faq-pill"        data-cat="start"    onclick="faqSetCat(this)">Getting started</button>
+      <button class="faq-pill"        data-cat="results"  onclick="faqSetCat(this)">Your results</button>
+      <button class="faq-pill"        data-cat="accuracy" onclick="faqSetCat(this)">Accuracy &amp; limits</button>
+      <button class="faq-pill"        data-cat="privacy"  onclick="faqSetCat(this)">Privacy</button>
+      <button class="faq-pill"        data-cat="help"     onclick="faqSetCat(this)">Troubleshooting</button>
+    </div>
+
+    <!-- Status line -->
+    <div class="faq-status" id="faq-status" role="status" aria-live="polite"></div>
+
+    <!-- ══ GETTING STARTED ══════════════════════════════════════════ -->
+    <section class="faq-group" data-cat="start">
+      <div class="section-header-clean" style="margin-bottom: 14px;">
+        <div>
+          <h2 class="faq-group-heading">Getting started</h2>
+          <p class="faq-group-about">What TagaDetect does and how to run a check.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          What is TagaDetect?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>TagaDetect is a web tool that estimates how likely it is that a piece of writing was generated by an AI model such as ChatGPT, Claude, or Gemini. It works with English, Filipino (Tagalog), and Taglish text.</p>
+          <p>It is made for anyone who needs a second look at a piece of writing, including students, teachers, writers, editors, and publishers.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Which languages does it support?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>English, Filipino (Tagalog), and Taglish — the mix of Tagalog and English that many Filipinos use every day.</p>
+          <p>Taglish support is experimental. It has the least training data of the three, so treat Taglish results with extra caution.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          How do I check a text?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <ul>
+            <li>Paste your text into the box, or upload a <strong>.txt</strong> file.</li>
+            <li>Select <strong>Detect AI Content</strong>.</li>
+            <li>Read your results in the Result Analysis section below the box.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          How much text do I need?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Use at least <strong>50 words</strong>. A few full paragraphs give much better results. Very short texts — such as a single sentence or a chat message — don't show enough writing patterns for a dependable estimate.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Why won't TagaDetect analyze my text?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>It can refuse a text when:</p>
+          <ul>
+            <li>the text is too short,</li>
+            <li>the text is mostly numbers, tables, lists, or code, or</li>
+            <li>the text is in a language TagaDetect doesn't support.</li>
+          </ul>
+          <p>To fix this, paste complete paragraphs of normal written text in English, Filipino, or Taglish.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Can I upload Word or PDF files?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Not yet. You can upload <strong>.txt</strong> files only. For a Word or PDF document, copy the text from the file and paste it into the box.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Can I check several texts at once?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Not at the moment. Check one text at a time. Batch checking is planned for a future update.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ YOUR RESULTS ════════════════════════════════════════════ -->
+    <section class="faq-group" data-cat="results">
+      <div class="section-header-clean" style="margin-bottom: 14px;">
+        <div>
+          <h2 class="faq-group-heading">Your results</h2>
+          <p class="faq-group-about">What the score, the verdict, and the heatmap tell you.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          What does the AI score mean?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>The score is an estimate of how likely it is that the whole text was written by AI. It is <strong>not</strong> the share of your text that came from AI.</p>
+          <p>For example, 26% means the model found only weak signs of AI writing. It does not mean a quarter of the text was AI-written.</p>
+          <div class="verdict-scale" role="img" aria-label="Verdict scale from likely human-written to likely AI-generated">
+            <div class="vs-good">Likely human-written</div>
+            <div class="vs-mid">Unclear</div>
+            <div class="vs-bad">Likely AI-generated</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          What do the verdicts mean?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <ul>
+            <li><strong>Likely human-written:</strong> the writing shows few of the patterns the model links with AI text.</li>
+            <li><strong>Unclear:</strong> the signals are mixed. Don't draw a conclusion from this result.</li>
+            <li><strong>Likely AI-generated:</strong> the writing shows many patterns the model links with AI text. This is still an estimate, not proof.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          What is the sentence heatmap?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>The heatmap colors parts of your text to show which passages look more or less like AI writing. Use it to see where to look more closely.</p>
+          <p>Scores are calculated for small groups of sentences, not for each sentence alone, and they are approximate. A single highlighted sentence does not mean that sentence was written by AI.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Does a high AI score prove someone used AI?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>No. A detector can only estimate, and it can be wrong in both directions. A high score is a reason to look closer, not a verdict.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          I'm a teacher or editor. How should I use the results?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Treat the result as one signal among several, never as the only evidence. Helpful next steps:</p>
+          <ul>
+            <li>compare the text with the writer's earlier work,</li>
+            <li>ask to see drafts or the document's edit history,</li>
+            <li>talk with the writer and let them explain how they wrote it.</li>
+          </ul>
+          <p>Avoid penalizing anyone based on a score alone.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Why was my own writing flagged as AI?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Detectors sometimes flag real human writing. This is more likely when the text is:</p>
+          <ul>
+            <li>very formal, polished, or written from a template, such as a cover letter or report,</li>
+            <li>heavily rewritten with grammar or rewriting tools,</li>
+            <li>short,</li>
+            <li>written by someone still learning the language.</li>
+          </ul>
+          <p>If you believe a result is wrong, please report it. See <em>"How do I report a wrong result?"</em> under Troubleshooting.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Why wasn't AI-written text flagged?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>AI text can slip through when it has been edited or paraphrased by a person, mixed with human writing, or produced by a newer AI model than the ones TagaDetect learned from. A "Likely human-written" result does not guarantee that no AI was involved.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ ACCURACY AND LIMITS ═════════════════════════════════════ -->
+    <section class="faq-group" data-cat="accuracy">
+      <div class="section-header-clean" style="margin-bottom: 14px;">
+        <div>
+          <h2 class="faq-group-heading">Accuracy &amp; limits</h2>
+          <p class="faq-group-about">How TagaDetect works and where it can fall short.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          How does TagaDetect work?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>TagaDetect looks at patterns in how a text is written — such as the words and letter combinations used, how sentence lengths vary, and how punctuation is used. It compares those patterns with examples of human and AI writing it learned from, then estimates the likelihood that your text is AI-generated.</p>
+          <p>It does not search the internet, and it does not know who wrote the text.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          How accurate is it?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>No AI detector is always right. TagaDetect is still being tested, so accuracy figures are not published yet.</p>
+          <p>English has the most training data, Filipino has less, and Taglish has the least. Expect results to be steadier for English than for the other two, and treat every result as an estimate.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Does it work on Taglish?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Yes, but it is experimental. Text that switches between Tagalog and English is harder to judge, and the model has had less Taglish to learn from. Results for Taglish are marked as experimental and should be read with extra care.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          What kinds of text work best?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Essays, articles, reports, and posts of several sentences or more, written in English, Filipino, or Taglish.</p>
+          <p>It is not designed for poems, song lyrics, code, tables, lists, or very short messages.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Does it check for plagiarism?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>No. TagaDetect estimates whether a text looks AI-generated. It does not compare your text with other sources, so it cannot tell you whether something was copied.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Can it tell which AI wrote a text?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>No. It gives one overall estimate and does not identify a specific AI tool.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Can the result be fooled?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Yes. Rewriting AI text by hand, paraphrasing it, or mixing it with your own writing can lower the score. This is a limit of every AI detector — another reason to treat results as an estimate.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ PRIVACY ════════════════════════════════════════════════ -->
+    <section class="faq-group" data-cat="privacy">
+      <div class="section-header-clean" style="margin-bottom: 14px;">
+        <div>
+          <h2 class="faq-group-heading">Privacy</h2>
+          <p class="faq-group-about">What happens to the text you check.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Is my text saved?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Your text is analyzed to produce a result and is not kept on our servers. Your history, if you use it, is saved only in your own browser.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          How do I delete my history?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Open History and delete individual entries, or clear the whole list. Clearing your browser's site data for TagaDetect also removes it.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Is my text used to improve TagaDetect?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Only if you choose to share it. If you report a wrong result and agree to share the text, it may be used to improve the model. Nothing is shared without your agreement.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Can other people see my results?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>No. Your results and history are visible only to you in your browser.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ TROUBLESHOOTING ════════════════════════════════════════ -->
+    <section class="faq-group" data-cat="help">
+      <div class="section-header-clean" style="margin-bottom: 14px;">
+        <div>
+          <h2 class="faq-group-heading">Troubleshooting</h2>
+          <p class="faq-group-about">Fixes for common problems.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          Nothing happens when I select Detect AI Content
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <ul>
+            <li>Check that the text box is not empty and the text meets the minimum length.</li>
+            <li>Refresh the page and try again.</li>
+            <li>Check your internet connection.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          My uploaded file shows strange characters
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Save the file as a <strong>.txt</strong> file with <strong>UTF-8 encoding</strong>. In Notepad, choose Save As and set Encoding to UTF-8. This keeps characters such as ñ and curved quotation marks intact. If it still looks wrong, paste the text into the box instead.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          The page is too dark or too bright
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Use the theme switch (☀️ / 🌙) in the top-right corner of any page to change between dark and light mode.</p>
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-trigger" onclick="faqToggle(this)">
+          How do I report a wrong result?
+          <span class="faq-chevron"></span>
+        </button>
+        <div class="faq-body">
+          <p>Use the <strong>Feedback</strong> option on the results screen to tell us the result was wrong, and say whether the text was written by a person or by AI. Reports help us find where the model needs to improve.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Empty state -->
+    <div class="faq-empty" id="faq-empty" style="display:none;">
+      <strong>No questions match your search.</strong><br>
+      Try fewer words, or select <em>All</em> to see every topic.
+    </div>
+
+    <!-- Footer note -->
+    <div class="faq-note">
+      <strong>TagaDetect gives an estimate, not proof.</strong> Use a result as one signal alongside your own judgment, and give people a chance to explain before drawing conclusions.
+    </div>
+
+  </main>
+
+  <!-- Scripts -->
+  <script src="data.js"></script>
+  <script src="nav.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      TagaNav.renderNavbar('faq');
+      faqApply();
+    });
+
+    /* ── Current category ───────────────────────────────── */
+    let faqCurrentCat = 'all';
+
+    function faqSetCat(btn) {
+      faqCurrentCat = btn.getAttribute('data-cat');
+      document.querySelectorAll('.faq-pill').forEach(b =>
+        b.classList.toggle('active', b === btn)
+      );
+      faqApply();
+    }
+
+    /* ── Filter + search ────────────────────────────────── */
+    function faqApply() {
+      const term = document.getElementById('faq-search-input').value.trim().toLowerCase();
+      const groups = document.querySelectorAll('.faq-group');
+      let total = 0;
+
+      groups.forEach(group => {
+        const inCat = faqCurrentCat === 'all' || group.getAttribute('data-cat') === faqCurrentCat;
+        let shown = 0;
+
+        group.querySelectorAll('.faq-item').forEach(item => {
+          const match = !term || item.textContent.toLowerCase().includes(term);
+          const visible = inCat && match;
+          item.style.display = visible ? '' : 'none';
+          if (visible) shown++;
+        });
+
+        group.style.display = shown > 0 ? '' : 'none';
+        total += shown;
+      });
+
+      const status = document.getElementById('faq-status');
+      status.textContent = total
+        ? `${total} ${total === 1 ? 'question' : 'questions'}`
+        : '';
+
+      document.getElementById('faq-empty').style.display = total === 0 ? '' : 'none';
+    }
+
+    /* ── Accordion toggle ───────────────────────────────── */
+    function faqToggle(btn) {
+      const item = btn.closest('.faq-item');
+      const isOpen = item.classList.contains('open');
+      item.classList.toggle('open', !isOpen);
+      btn.setAttribute('aria-expanded', String(!isOpen));
+    }
+  </script>
+</body>
+</html>
