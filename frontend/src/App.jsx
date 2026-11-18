@@ -6,6 +6,26 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
+// Loads every PNG in src/assets/icons. Vite supports this without any install.
+const ICON_FILES = import.meta.glob('./assets/icons/*.png', {
+  eager: true,
+  import: 'default',
+})
+
+function Icon({ name, size = 16, className = '' }) {
+  const src = ICON_FILES[`./assets/icons/${name}.png`]
+  if (!src) return null
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      width={size}
+      height={size}
+      className={`inline-block shrink-0 object-contain ${className}`}
+    />
+  )
+}
 
 /* =====================================================================
    SECTION 1: STORAGE (saves data in the browser, like data.js did)
@@ -669,14 +689,13 @@ function Toasts({ toasts }) {
     danger: 'border-l-rose',
     error: 'border-l-rose',
   }
-  const icons = {
+   const icons = {
     success: '✓',
-    info: 'ℹ️',
-    warning: '⚠️',
+    info: <Icon name="info" />,
+    warning: <Icon name="warning" />,
     danger: '✕',
     error: '✕',
   }
-
   return (
     <div className="fixed bottom-6 right-6 z-[300] flex flex-col gap-2.5">
       {toasts.map((t) => (
@@ -1563,7 +1582,7 @@ function HomePage() {
         <div className="bg-rose/10 border border-rose rounded-[20px] px-[22px] py-[18px] mb-7">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3.5">
-              <span className="text-[26px]">⏳</span>
+                            <Icon name="hourglass" size={28} />
               <div>
                 <h3 className="text-[15px] font-bold text-rose">
                   Professor Account Pending Administrative Verification
@@ -1710,7 +1729,9 @@ function HomePage() {
       {/* Class grid */}
       {roleClasses.length === 0 ? (
         <div className={`${cardClass} text-center !px-6 !py-12`}>
-          <div className="text-[38px] mb-3">{isStudent ? '🎒' : '📚'}</div>
+          <div className="mb-3">
+            <Icon name={isStudent ? 'backpack' : 'books'} size={44} />
+          </div>
           <h3 className="text-lg font-bold mb-2">
             {isStudent ? 'No Enrolled Classes Found' : 'No Handled Classes Found'}
           </h3>
@@ -2192,10 +2213,10 @@ function ClassPage({ route }) {
   const setMatField = (field) => (e) =>
     setMatForm((prev) => ({ ...prev, [field]: e.target.value }))
 
-  const tabs = [
-    { id: 'activities', label: `📝 Activities & Passing (${classActivities.length})` },
-    { id: 'materials', label: `📁 Class Materials (${classMaterials.length})` },
-    { id: 'people', label: `👥 People in Class (${enrolled.length + 1})` },
+    const tabs = [
+    { id: 'activities', label: `Activities & Passing (${classActivities.length})`, icon: 'document' },
+    { id: 'materials', label: `Class Materials (${classMaterials.length})`, icon: 'folder' },
+    { id: 'people', label: `People in Class (${enrolled.length + 1})`, icon: 'people' },
   ]
 
   return (
@@ -2224,11 +2245,17 @@ function ClassPage({ route }) {
             <h1 className="text-[26px] font-extrabold text-main mb-2">{cls.subjectName}</h1>
             <p className="text-sm text-muted max-w-[680px]">{cls.description}</p>
             <div className="flex items-center gap-4 mt-3.5 text-[13px] text-muted flex-wrap">
-              <span>📍 {cls.room}</span>
+                            <span className="inline-flex items-center gap-1.5">
+                <Icon name="location" size={15} /> {cls.room}
+              </span>
               <span>•</span>
-              <span>⏰ {cls.schedule}</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="clock" size={15} /> {cls.schedule}
+              </span>
               <span>•</span>
-              <span>👥 {enrolled.length} Students Enrolled</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="people" size={15} /> {enrolled.length} Students Enrolled
+              </span>
             </div>
           </div>
 
@@ -2255,7 +2282,7 @@ function ClassPage({ route }) {
                 title="Click to copy"
                 className="inline-flex items-center text-[11px] font-bold uppercase bg-transparent border border-accent/30 text-accent px-2.5 py-1 rounded-md cursor-pointer hover:bg-accent/10"
               >
-                {cls.code} 📋
+              {cls.code} <Icon name="copy" size={14} className="ml-1.5" />
               </button>
             </div>
           </div>
@@ -2269,6 +2296,7 @@ function ClassPage({ route }) {
               onClick={() => setTab(t.id)}
               className={btn(tab === t.id ? 'primary' : 'secondary', '!px-4 !py-[7px] !text-[13px]')}
             >
+              <Icon name={t.icon} size={16} />
               {t.label}
             </button>
           ))}
@@ -2443,7 +2471,7 @@ function ClassPage({ route }) {
                                       className={btn('primary', '!text-[11px] !px-3 !py-1')}
                                       onClick={() => openGrade(sub)}
                                     >
-                                      {hasGrade(sub) ? `Graded: ${sub.grade}` : 'Grade 📝'}
+                                    {hasGrade(sub) ? `Graded: ${sub.grade}` : <>Grade <Icon name="document" size={14} /></>}
                                     </button>
                                   </div>
                                 </div>
@@ -2519,7 +2547,7 @@ function ClassPage({ route }) {
                       className={btn('secondary', '!text-[11px] !px-3 !py-[5px]')}
                       onClick={() => toast(`Downloading "${mat.title}"...`)}
                     >
-                      Download 📥
+                     Download <Icon name="download" size={14} />
                     </button>
                   </div>
                 </div>
@@ -3000,7 +3028,11 @@ function DetectorPage() {
                 disabled={analyzing}
                 onClick={() => runDetection()}
               >
-                {analyzing ? 'Analyzing... ⏳' : 'Analyze Passage ⚡'}
+                                {analyzing ? (
+                  <>Analyzing... <Icon name="hourglass" size={15} /></>
+                ) : (
+                  <>Analyze Passage <Icon name="bolt" size={15} /></>
+                )}
               </button>
             </div>
           </div>
@@ -3016,14 +3048,16 @@ function DetectorPage() {
                 className={btn('secondary', '!text-[11px] !px-2.5 !py-1')}
                 onClick={() => setFbOpen(true)}
               >
-                Give Feedback 💬
+               Give Feedback <Icon name="feedback" size={14} />
               </button>
             )}
           </div>
 
           {!result ? (
             <div className="text-center px-5 py-[50px] text-muted">
-              <div className="text-[40px] mb-3">🔍</div>
+              <div className="mb-3 flex justify-center">
+                <Icon name="search" size={44} />
+              </div>
               <p className="text-sm font-semibold">Awaiting Analysis</p>
               <p className="text-xs mt-1">
                 Paste your content on the left and click "Analyze Passage" to generate
@@ -4087,7 +4121,7 @@ function AdminPage() {
         <div className="bg-accent/10 border border-accent rounded-[14px] px-6 py-[18px] mb-7">
           <div className="flex justify-between items-center flex-wrap gap-3.5">
             <div className="flex items-center gap-3.5">
-              <span className="text-[28px]">🔐</span>
+              <Icon name="lock" size={30} />
               <div>
                 <h3 className="text-[15px] font-bold text-main">Viewing as Non-Admin</h3>
                 <p className="text-[13px] text-muted mt-0.5">
@@ -4101,7 +4135,7 @@ function AdminPage() {
               className={btn('primary')}
               onClick={() => switchUser('usr_admin')}
             >
-              Switch to Admin (Eleanor) 🛡️
+            Switch to Admin (Eleanor) <Icon name="shield" size={16} />
             </button>
           </div>
         </div>
