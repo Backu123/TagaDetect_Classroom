@@ -620,13 +620,13 @@ function btn(kind = 'primary', extra = '') {
 
 function badge(variant = 'ai', extra = '') {
   const base =
-    'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border'
+    'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold'
   const variants = {
-    ai: 'bg-accent/20 text-accent border-accent',
-    human: 'bg-emerald/20 text-emerald border-emerald',
-    mixed: 'bg-amber/20 text-amber border-amber',
-    pending: 'bg-rose/20 text-rose border-rose',
-    success: 'bg-emerald/20 text-emerald border-emerald',
+    ai: 'bg-accent/20 text-accent',
+    human: 'bg-emerald/20 text-emerald',
+    mixed: 'bg-amber/20 text-amber',
+    pending: 'bg-rose/20 text-rose',
+    success: 'bg-emerald/20 text-emerald',
   }
   return `${base} ${variants[variant]} ${extra}`
 }
@@ -766,7 +766,7 @@ function Navbar({ route }) {
           <a href="#/admin" className={navItem('admin')}>
             Admin Approvals
             {pendingCount > 0 && (
-              <span className="ml-1 px-[7px] py-0.5 text-[11px] font-semibold rounded-full bg-rose/20 text-rose border border-rose">
+              <span className="ml-1 px-[7px] py-0.5 text-[11px] font-semibold rounded-full bg-rose/20 text-rose">
                 {pendingCount}
               </span>
             )}
@@ -1353,7 +1353,7 @@ function ClassCard({ cls, activityCount, materialCount }) {
 
       <div>
         <div className="flex items-center justify-between mb-3.5">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.5px] uppercase bg-accent/10 border border-accent/30 text-accent px-2.5 py-1 rounded-md">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.5px] uppercase bg-accent/10 text-accent px-2.5 py-1 rounded-md">
             <svg
               width="11"
               height="11"
@@ -1367,7 +1367,7 @@ function ClassCard({ cls, activityCount, materialCount }) {
             </svg>
             CODE: {cls.code}
           </span>
-          <span className="text-[11px] text-muted font-semibold bg-card-inner border border-line px-2 py-[3px] rounded">
+          <span className="text-[11px] text-muted font-semibold bg-card-inner px-2 py-[3px] rounded">
             {cls.section}
           </span>
         </div>
@@ -1395,7 +1395,7 @@ function ClassCard({ cls, activityCount, materialCount }) {
 
       <div className="flex items-center justify-between gap-2.5 pt-3.5 mt-auto border-t border-line">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="inline-flex items-center gap-[5px] text-[11px] font-semibold text-muted bg-card-inner border border-line px-2 py-1 rounded-md">
+          <span className="inline-flex items-center gap-[5px] text-[11px] font-semibold text-muted bg-card-inner px-2 py-1 rounded-md">
             <svg
               width="12"
               height="12"
@@ -1411,7 +1411,7 @@ function ClassCard({ cls, activityCount, materialCount }) {
             </svg>
             {activityCount} Activities
           </span>
-          <span className="inline-flex items-center gap-[5px] text-[11px] font-semibold text-muted bg-card-inner border border-line px-2 py-1 rounded-md">
+          <span className="inline-flex items-center gap-[5px] text-[11px] font-semibold text-muted bg-card-inner px-2 py-1 rounded-md">
             <svg
               width="12"
               height="12"
@@ -2235,10 +2235,10 @@ function ClassPage({ route }) {
         <div className="flex justify-between items-start gap-5 flex-wrap">
           <div>
             <div className="flex items-center gap-2 mb-2.5">
-              <span className="inline-flex items-center text-[11px] font-bold tracking-[0.5px] uppercase bg-accent/10 border border-accent/30 text-accent px-2.5 py-1 rounded-md">
+              <span className="inline-flex items-center text-[11px] font-bold tracking-[0.5px] uppercase bg-accent/10 text-accent px-2.5 py-1 rounded-md">
                 CODE: {cls.code}
               </span>
-              <span className="text-[11px] text-muted font-semibold bg-card-inner border border-line px-2 py-[3px] rounded">
+              <span className="text-[11px] text-muted font-semibold bg-card-inner px-2 py-[3px] rounded">
                 {cls.section}
               </span>
             </div>
@@ -2280,7 +2280,7 @@ function ClassPage({ route }) {
                 type="button"
                 onClick={copyCode}
                 title="Click to copy"
-                className="inline-flex items-center text-[11px] font-bold uppercase bg-transparent border border-accent/30 text-accent px-2.5 py-1 rounded-md cursor-pointer hover:bg-accent/10"
+                className="inline-flex items-center text-[11px] font-bold uppercase bg-transparent text-accent px-2.5 py-1 rounded-md cursor-pointer hover:bg-accent/10"
               >
               {cls.code} <Icon name="copy" size={14} className="ml-1.5" />
               </button>
@@ -2368,7 +2368,7 @@ function ClassPage({ route }) {
                           <div className="flex items-center flex-wrap gap-2">
                             {mySub ? (
                               <>
-                                <span className={badge('human')}>Passed ✓</span>
+                                <span className={badge('human')}>Passed</span>
                                 <span className="text-xs text-muted">
                                   Passed on {new Date(mySub.submittedAt).toLocaleDateString()}
                                 </span>
@@ -3168,7 +3168,7 @@ function DetectorPage() {
                     • {new Date(fb.timestamp).toLocaleDateString()}
                   </span>
                 </div>
-                <span className="text-[10px] font-bold uppercase bg-accent/10 border border-accent/30 text-accent px-2 py-[3px] rounded-md">
+                <span className="text-[10px] font-bold uppercase bg-accent/10 text-accent px-2 py-[3px] rounded-md">
                   {fb.feedbackType}
                 </span>
               </div>
