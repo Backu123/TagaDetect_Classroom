@@ -1588,6 +1588,7 @@ function HomePage() {
   const {
     user,
     classes,
+    setClasses,
     reloadClasses,
     activities,
     materials,
@@ -4916,6 +4917,10 @@ function App() {
     STORAGE_KEYS.ACTIVITIES,
     INITIAL_ACTIVITIES,
   );
+    const [classes, setClasses] = usePersistedState(
+    STORAGE_KEYS.CLASSES,
+    INITIAL_CLASSES,
+  );
   const [materials, setMaterials] = usePersistedState(
     STORAGE_KEYS.MATERIALS,
     INITIAL_MATERIALS,
@@ -5111,6 +5116,7 @@ function App() {
     users,
     setUsers,
     classes,
+    setClasses,
     reloadClasses,
     activities,
     setActivities,
