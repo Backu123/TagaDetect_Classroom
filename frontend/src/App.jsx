@@ -1667,6 +1667,7 @@ function HomePage() {
   };
 
   const submitCreate = () => {
+    
     if (user.role !== "professor" && user.role !== "admin") {
       toast("Only professors can create new class sections.", "warning");
       return;
