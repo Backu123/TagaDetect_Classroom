@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
@@ -60,9 +60,6 @@
       <div class="card" style="padding: 24px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <h3 style="font-size: 16px; font-weight: 700;">Diagnostic Results</h3>
-          <button class="btn btn-secondary" id="btn-open-feedback" style="font-size: 11px; padding: 4px 10px; display: none;" onclick="TagaNav.openModal('feedback-modal')">
-            Give Feedback 💬
-          </button>
         </div>
 
         <div id="results-placeholder" style="text-align: center; padding: 50px 20px; color: var(--text-muted);">
@@ -109,64 +106,7 @@
       </div>
     </div>
 
-    <!-- User Feedback Section -->
-    <div class="card" style="margin-top: 32px; padding: 24px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <div>
-          <h3 style="font-size: 16px; font-weight: 700;">Community & Faculty Feedback Stream</h3>
-          <p style="font-size: 13px; color: var(--text-muted);">Recent user ratings on AI detection precision, false positives, and cadence metrics.</p>
-        </div>
-        <button class="btn btn-secondary" style="font-size: 12px; padding: 6px 14px;" onclick="TagaNav.openModal('feedback-modal')">
-          + Submit Result Feedback
-        </button>
-      </div>
-
-      <div id="feedback-stream-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
-    </div>
   </main>
-
-  <!-- User Feedback Modal -->
-  <div class="modal-backdrop" id="feedback-modal">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div>
-          <h2 class="modal-title">AI Detector Result Feedback</h2>
-          <p class="modal-subtitle">Help improve detection models by sharing evaluation feedback</p>
-        </div>
-        <button class="modal-close-btn" onclick="TagaNav.closeModal('feedback-modal')">✕</button>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Accuracy Rating</label>
-        <select id="fb-rating" class="form-input">
-          <option value="highly_accurate">Highly Accurate (Reflects True Authorship)</option>
-          <option value="partially_accurate">Partially Accurate (Mixed Nuance)</option>
-          <option value="false_positive">False Positive (Human text flagged as AI)</option>
-          <option value="false_negative">False Negative (AI text undetected)</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Feedback Category</label>
-        <select id="fb-type" class="form-input">
-          <option value="Accuracy Feedback">General Accuracy</option>
-          <option value="False Positive Flags">False Positive Correction</option>
-          <option value="False Negative Flags">Missed AI Usage</option>
-          <option value="Sentence Highlight Correction">Sentence Highlight Feedback</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Detailed Commentary</label>
-        <textarea id="fb-comment" class="form-textarea" placeholder="Explain which sentences or elements were misclassified..."></textarea>
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="TagaNav.closeModal('feedback-modal')">Cancel</button>
-        <button class="btn btn-primary" onclick="submitUserFeedback()">Submit Feedback</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Toast Notification Container -->
   <div id="toast-container"></div>
@@ -186,7 +126,6 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       TagaNav.renderNavbar('detector');
-      renderFeedbackStream();
     });
 
     function loadSampleText(type) {
@@ -202,7 +141,6 @@
       updateCounters('');
       document.getElementById('results-placeholder').style.display = 'block';
       document.getElementById('results-display').style.display = 'none';
-      document.getElementById('btn-open-feedback').style.display = 'none';
     }
 
     function updateCounters(val) {
@@ -233,7 +171,6 @@
 
         document.getElementById('results-placeholder').style.display = 'none';
         document.getElementById('results-display').style.display = 'block';
-        document.getElementById('btn-open-feedback').style.display = 'inline-flex';
 
         // Animate circular gauge
         const gauge = document.getElementById('gauge-progress');
@@ -275,61 +212,6 @@
       }, 400);
     }
 
-    function submitUserFeedback() {
-      const rating = document.getElementById('fb-rating').value;
-      const type = document.getElementById('fb-type').value;
-      const comment = document.getElementById('fb-comment').value.trim();
-
-      if (!comment) {
-        TagaNav.toast('Please write a brief comment describing your feedback.', 'warning');
-        return;
-      }
-
-      const currentUser = TagaNav.getCurrentUser();
-      const feedbackList = TagaStore.get(STORAGE_KEYS.FEEDBACK, INITIAL_AI_FEEDBACK);
-
-      const newFeedback = {
-        id: `fb_${Date.now()}`,
-        userId: currentUser.id,
-        userName: currentUser.name,
-        userRole: currentUser.role,
-        timestamp: new Date().toISOString(),
-        detectedScore: currentScore,
-        accuracyRating: rating,
-        feedbackType: type,
-        comment: comment,
-        status: 'Audited'
-      };
-
-      feedbackList.unshift(newFeedback);
-      TagaStore.set(STORAGE_KEYS.FEEDBACK, feedbackList);
-
-      TagaNav.closeModal('feedback-modal');
-      TagaNav.toast('Thank you! Your feedback on the detection result was recorded.');
-      renderFeedbackStream();
-    }
-
-    function renderFeedbackStream() {
-      const list = TagaStore.get(STORAGE_KEYS.FEEDBACK, INITIAL_AI_FEEDBACK);
-      const container = document.getElementById('feedback-stream-list');
-      if (!container) return;
-
-      container.innerHTML = list.slice(0, 5).map(fb => `
-        <div style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <strong style="font-size: 13px; color: var(--text-main);">${fb.userName}</strong>
-              <span class="badge ${fb.userRole === 'professor' ? 'badge-ai' : 'badge-human'}" style="font-size: 9px; padding: 2px 6px;">
-                ${fb.userRole}
-              </span>
-              <span style="font-size: 11px; color: var(--text-muted);">• ${new Date(fb.timestamp).toLocaleDateString()}</span>
-            </div>
-            <span class="clean-subject-badge" style="font-size: 10px;">${fb.feedbackType}</span>
-          </div>
-          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 0;">"${fb.comment}"</p>
-        </div>
-      `).join('');
-    }
   </script>
 
   <!-- FAQ nudge banner -->
