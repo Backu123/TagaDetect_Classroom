@@ -3796,12 +3796,18 @@ function HeroTag({ children }) {
 }
 
 /* ---------- About ---------- */
+const TEAM_PHOTOS = import.meta.glob("./assets/team/*.{jpg,jpeg,png,webp}", {
+  eager: true,
+  import: "default",
+});
 
+const teamPhoto = (file) => TEAM_PHOTOS[`./assets/team/${file}`];
 const ABOUT_FOUNDERS = [
   {
     name: "Timoth Rayjell E. Audije",
     role: "Backend Developer & Machine Learning Lead",
     bio: "Leads the backend architecture and machine learning pipeline powering TagaDetect's heuristic AI analysis engine.",
+        avatar: teamPhoto("audije.png"),
     initial: "T",
     work: [
       "Machine Learning Engine",
@@ -3813,6 +3819,7 @@ const ABOUT_FOUNDERS = [
     name: "John Wayne M. Capistrano",
     role: "Design & Frontend Developer",
     bio: "Crafts the visual identity and user interface of TagaDetect, ensuring an intuitive and accessible experience for all users.",
+    avatar: teamPhoto("capistrano.jpg"),
     initial: "J",
     work: [
       "UI/UX Design System",
@@ -3824,6 +3831,7 @@ const ABOUT_FOUNDERS = [
     name: "Leilanie Alaine M. Cristobal",
     role: "Backend Developer & Documenter",
     bio: "Develops core backend systems and maintains comprehensive technical documentation for the TagaDetect platform.",
+    avatar: teamPhoto("cristobal.jpg"),
     initial: "L",
     work: [
       "Backend Systems",
@@ -3835,6 +3843,7 @@ const ABOUT_FOUNDERS = [
     name: "Gabriel M. Samaniego",
     role: "Frontend Developer & Documenter",
     bio: "Implements frontend features and contributes to the platform's documentation, ensuring clarity and consistency throughout.",
+    avatar: teamPhoto("samaniego.png"),
     initial: "G",
     work: [
       "Frontend Implementation",
@@ -3846,44 +3855,44 @@ const ABOUT_FOUNDERS = [
 
 const ABOUT_HOWTOS = [
   {
-    title: "1. Predictive Token Shuffling & Cadence",
+    title: "1. How a Text Gets Checked",
     steps: [
       [
-        "Step 1: Sentence Tokenization",
-        "Raw text is parsed into discrete clause tokens while retaining boundary delimiters.",
+        "Step 1: Paste your text",
+        "Add at least 50 words of English, Filipino, or Taglish. Longer passages give steadier results.",
       ],
       [
-        "Step 2: Shuffled Heuristic Analysis",
-        "Evaluates n-gram uniformity and structural variance across the text blocks.",
+        "Step 2: Pattern analysis",
+        "The model looks at word choice, sentence length variety, and punctuation, then compares them with examples of human and AI writing.",
       ],
       [
-        "Step 3: Cadence Scoring",
-        "Computes perplexity invariants (0-100) and burstiness variability (sentence length distribution).",
+        "Step 3: Score and verdict",
+        "You get an AI probability from 0 to 100 and a verdict: Likely human written, Unclear, or Likely AI generated.",
       ],
       [
-        "Step 4: Color-Coded Tagging",
-        "Sentences are tagged as High AI (rose/purple), Hybrid/Mixed (amber), or Authentic Human (emerald).",
+        "Step 4: Sentence heatmap",
+        "Passages are colored green, amber, or rose so you can see where to look more closely. It is a guide, not proof.",
       ],
     ],
   },
   {
-    title: "2. Automated Review upon Student Submission",
+    title: "2. How Class Submissions Work",
     steps: [
       [
-        "Step 1: Student Passes Text",
-        "The student inputs their written reflection or essay into the submission portal.",
+        "Step 1: Student passes an activity",
+        "The student writes or pastes their work for an activity published by the professor.",
       ],
       [
-        "Step 2: Instant Engine Execution",
-        "The submission triggers `generateSubmissionReview()` immediately on pass.",
+        "Step 2: Automatic check",
+        "The check runs right away when the work is passed, with no extra step for the student or the professor.",
       ],
       [
-        "Step 3: Shared Report Storage",
-        "A comprehensive diagnostic report is attached to the submission record.",
+        "Step 3: One shared report",
+        "The student and the professor see the same report, so there are no hidden results.",
       ],
       [
-        "Step 4: Dual Transparency",
-        "Both the student and instructor view the identical analysis report before grading.",
+        "Step 4: Professor decides",
+        "The professor reads the work, uses the report as one signal, and then records the grade and feedback.",
       ],
     ],
   },
@@ -3907,23 +3916,23 @@ const ABOUT_FAQS = [
 function AboutPage() {
   return (
     <div>
-      <section className="text-center max-w-[780px] mx-auto mb-[50px]">
-        <HeroTag>ARCHITECTURE & FOUNDATION</HeroTag>
+            <section className="text-center max-w-[780px] mx-auto mb-[50px]">
+        <HeroTag>ABOUT TAGADETECT</HeroTag>
         <h1 className="text-[32px] max-md:text-2xl font-extrabold text-main mt-2">
-          Transparent Academic Integrity & AI Stylistics
+          Fair Checks for Writing in English, Filipino, and Taglish
         </h1>
         <p className="text-muted text-[15px] mt-2.5 leading-relaxed">
-          TagaDetect was created to bridge pedagogical transparency with
-          cutting-edge stylistic heuristic modeling. We believe academic
-          integrity should empower student expression rather than serve as a
-          punitive black box.
+          TagaDetect helps teachers and students take a closer look at
+          writing. It estimates how likely a text is to be AI generated,
+          highlights the passages that stand out, and explains every result,
+          so the score starts a conversation instead of ending one.
         </p>
       </section>
 
       <section className="mb-[60px]">
         <SectionHeader
-          title="Platform Founders & Research Architects"
-          subtitle="The interdisciplinary team behind the heuristic shuffle engine and classroom architecture"
+          title="Meet the Team Behind TagaDetect"
+          subtitle="The people who designed, built, and tested the platform"
         />
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(270px,100%),1fr))] gap-6">
           {ABOUT_FOUNDERS.map((f) => (
@@ -3961,10 +3970,10 @@ function AboutPage() {
         </div>
       </section>
 
-      <section className="mb-[60px]">
+        <section className="mb-[60px]">
         <SectionHeader
-          title="Technical How-To's"
-          subtitle="Detailed step-by-step documentation on how TagaDetect operates under the hood"
+          title="How It Works"
+          subtitle="A simple look at how TagaDetect checks writing and handles class submissions"
         />
         <div className="grid grid-cols-2 max-md:grid-cols-1 gap-6">
           {ABOUT_HOWTOS.map((guide) => (
@@ -3975,7 +3984,7 @@ function AboutPage() {
               <div className="flex flex-col gap-3 text-[13px] text-muted">
                 {guide.steps.map(([step, detail]) => (
                   <div key={step}>
-                    <strong className="text-main">{step}</strong> —{" "}
+                    <strong className="text-main">{step}</strong>:{" "}
                     <RichText text={detail} />
                   </div>
                 ))}
