@@ -4488,13 +4488,72 @@ function FaqPage() {
 /* ---------- Settings ---------- */
 
 function SettingsPage() {
-  const { user, theme, setTheme, toast } = useApp();
+  const { user, theme, setTheme, toast, setProfile } = useApp();
   const [prefs, setPrefs] = usePersistedState("tagadetect_settings", {
     sensitivity: "balanced",
     shuffleMode: "pseudo_shuffled",
   });
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    fullName: "",
+    username: "",
+    avatarUrl: "",
+  });
 
   if (!user) return null;
+
+  const openEdit = () => {
+    setEditForm({
+      fullName: user.full_name || "",
+      username: user.username || "",
+      avatarUrl: user.avatar_url || "",
+    });
+    setEditOpen(true);
+  };
+
+  const setEditField = (field) => (e) =>
+    setEditForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const saveProfile = async () => {
+    const fullName = editForm.fullName.trim();
+    const username = editForm.username.trim();
+    const avatarUrl = editForm.avatarUrl.trim();
+
+    if (!fullName || !username) {
+      toast("Full name and username are required.", "warning");
+      return;
+    }
+
+    setSaving(true);
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: fullName,
+        username,
+        avatar_url: avatarUrl || null,
+      })
+      .eq("id", user.id)
+      .select()
+      .maybeSingle();
+    setSaving(false);
+
+    if (error) {
+      toast(
+        error.code === "23505" ? "That username is already taken." : error.message,
+        "danger",
+      );
+      return;
+    }
+    if (!data) {
+      toast("Could not save. Supabase blocked the update.", "danger");
+      return;
+    }
+
+    setProfile(data);
+    setEditOpen(false);
+    toast("Profile updated!");
+  };
 
   const savePref = (field) => (e) => {
     const value = e.target.value;
@@ -4555,10 +4614,10 @@ function SettingsPage() {
               College of Computer Studies • UST / DLSU Partner Network
             </div>
           </div>
-          <button
+                    <button
             type="button"
             className={btn("secondary", "!text-xs !px-3.5 !py-1.5")}
-            onClick={() => toast("Profile details updated (demo mode).")}
+            onClick={openEdit}
           >
             Edit Profile
           </button>
@@ -4695,6 +4754,61 @@ function SettingsPage() {
           </button>
         </div>
       </div>
+            <Modal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        title="Edit Profile"
+        subtitle="Update how your name and photo appear across TagaDetect"
+        footer={
+          <>
+            <button
+              type="button"
+              className={btn("secondary")}
+              onClick={() => setEditOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={btn("primary")}
+              disabled={saving}
+              onClick={saveProfile}
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </>
+        }
+      >
+        <div className="mb-[18px]">
+          <label className={formLabelClass}>Full Name</label>
+          <input
+            type="text"
+            value={editForm.fullName}
+            onChange={setEditField("fullName")}
+            className={formInputClass}
+          />
+        </div>
+        <div className="mb-[18px]">
+          <label className={formLabelClass}>Username</label>
+          <input
+            type="text"
+            value={editForm.username}
+            onChange={setEditField("username")}
+            className={formInputClass}
+          />
+        </div>
+        <div>
+          <label className={formLabelClass}>Profile Photo Link</label>
+          <input
+            type="url"
+            value={editForm.avatarUrl}
+            onChange={setEditField("avatarUrl")}
+            placeholder="https://..."
+            className={formInputClass}
+          />
+        </div>
+      </Modal>
+
     </div>
   );
 }
@@ -5053,6 +5167,7 @@ function App() {
   };
   const ctx = {
     user,
+    setProfile,
     users,
     setUsers,
     classes,
