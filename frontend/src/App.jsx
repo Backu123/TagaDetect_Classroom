@@ -1588,7 +1588,6 @@ function HomePage() {
   const {
     user,
     classes,
-    setClasses,
     reloadClasses,
     activities,
     materials,
@@ -1628,7 +1627,7 @@ function HomePage() {
 
   const closeModal = () => setModal(null);
 
-  const submitEnroll = () => {
+  const submitEnroll = async () => {
     if (user.role !== "student") {
       toast("Only students can join class sections.", "warning");
       return;
@@ -1636,38 +1635,23 @@ function HomePage() {
 
     const code = enrollCode.trim().toUpperCase();
     if (!code) {
-      toast("Please enter a 6-character class code.", "warning");
+      toast("Please enter a class code.", "warning");
       return;
     }
 
-    const target = classes.find((c) => c.code.toUpperCase() === code);
-    if (!target) {
-      toast(
-        `Class code "${code}" not found. Try AUT-305, NET-310, or IS-306`,
-        "danger",
-      );
+    const { error } = await supabase.rpc("join_class", { class_code: code });
+    if (error) {
+      toast(error.message, "danger");
       return;
     }
 
-    if (target.studentIds && target.studentIds.includes(user.id)) {
-      toast(`You are already enrolled in ${target.subjectName}!`, "info");
-      closeModal();
-      return;
-    }
-
-    setClasses((prev) =>
-      prev.map((c) =>
-        c.id === target.id
-          ? { ...c, studentIds: [...(c.studentIds || []), user.id] }
-          : c,
-      ),
-    );
+    await reloadClasses();
     setEnrollCode("");
     closeModal();
-    toast(`Successfully joined ${target.subjectName} (${target.section})!`);
+    toast(`Successfully joined class ${code}!`);
   };
 
-  const submitCreate = () => {
+    const submitCreate = async () => {
     if (user.role !== "professor" && user.role !== "admin") {
       toast("Only professors can create new class sections.", "warning");
       return;
@@ -1689,28 +1673,33 @@ function HomePage() {
         .replace(/[^A-Za-z]/g, "")
         .substring(0, 3)
         .toUpperCase() || "CLS";
-    let code;
-    do {
-      code = `${prefix}-${Math.floor(100 + Math.random() * 899)}`;
-    } while (classes.some((c) => c.code === code));
+    const code = `${prefix}-${Math.floor(100 + Math.random() * 899)}`;
 
-    const newClass = {
-      id: `cls_${Date.now()}`,
+    const { error } = await supabase.from("classes").insert({
       code,
-      subjectName: title,
+      subject_name: title,
       section: createForm.section.trim() || "BSCS 3IS-1",
-      professorId: user.id,
-      professorName: user.name,
-      professorAvatar: user.avatar,
       room: createForm.room.trim() || "Lab 305",
       schedule: createForm.schedule.trim() || "Mon/Wed 1:00 PM - 2:30 PM",
       description:
         createForm.desc.trim() ||
         "Academic course section exploring foundational principles and applied projects.",
-      studentIds: ["usr_student_1", "usr_student_2"],
-    };
+      professor_id: user.id,
+      professor_name: user.name,
+      professor_avatar: user.avatar,
+    });
 
-    setClasses((prev) => [newClass, ...prev]);
+    if (error) {
+      toast(
+        error.code === "23505"
+          ? "That class code is already taken. Please click create again."
+          : error.message,
+        "danger",
+      );
+      return;
+    }
+
+    await reloadClasses();
     setCreateForm(EMPTY_CLASS_FORM);
     closeModal();
     toast(`Created section ${title}! Enrollment code: ${code}`);
@@ -4917,10 +4906,6 @@ function App() {
     STORAGE_KEYS.ACTIVITIES,
     INITIAL_ACTIVITIES,
   );
-    const [classes, setClasses] = usePersistedState(
-    STORAGE_KEYS.CLASSES,
-    INITIAL_CLASSES,
-  );
   const [materials, setMaterials] = usePersistedState(
     STORAGE_KEYS.MATERIALS,
     INITIAL_MATERIALS,
@@ -5116,7 +5101,6 @@ function App() {
     users,
     setUsers,
     classes,
-    setClasses,
     reloadClasses,
     activities,
     setActivities,
