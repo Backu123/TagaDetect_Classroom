@@ -1049,16 +1049,13 @@ function LoginPage() {
     }
   }, [lockoutTimer]);
 
-  const handleGoogle = async () => {
-    setIsSubmitting(true);
+    const handleGoogle = async () => {
+    localStorage.setItem("tagadetect_oauth_intent", "login");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
     });
-    if (error) {
-      toast(error.message, "danger");
-      setIsSubmitting(false);
-    }
+    if (error) toast(error.message, "danger");
   };
 
   const handleEmailLogin = async (e) => {
@@ -1305,7 +1302,8 @@ function SignupPage() {
 
   const isProf = form.role === "professor";
 
-  const handleGoogle = async () => {
+    const handleGoogle = async () => {
+    localStorage.setItem("tagadetect_oauth_intent", "signup");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
@@ -4969,6 +4967,28 @@ function App() {
     return () => {
       cancelled = true;
     };
+  }, [session]);
+
+    // Block Google sign in for emails that never registered
+  useEffect(() => {
+    if (!session) return;
+    const intent = localStorage.getItem("tagadetect_oauth_intent");
+    if (!intent) return;
+    localStorage.removeItem("tagadetect_oauth_intent");
+    if (intent !== "login") return;
+
+    const u = session.user;
+    const justCreated =
+      Math.abs(new Date(u.last_sign_in_at) - new Date(u.created_at)) < 15000;
+    if (!justCreated) return;
+
+    (async () => {
+      await supabase.rpc("delete_own_account");
+      await supabase.auth.signOut();
+      setProfile(null);
+      toast("No account found for this Google email. Please sign up first.", "warning");
+      navigate("signup");
+    })();
   }, [session]);
 
   // Same shape the rest of your app already expects
