@@ -1627,84 +1627,83 @@ function HomePage() {
 
   const closeModal = () => setModal(null);
 
-  const submitEnroll = async () => {
-    if (user.role !== "student") {
-      toast("Only students can join class sections.", "warning");
-      return;
+  
+
+const submitEnroll = async () => {
+  if (!isStudent) {
+    return toast("Only students can join class sections.", "warning");
+  }
+
+  const code = enrollCode.trim().toUpperCase();
+
+  if (!code) {
+    return toast("Please enter a class code.", "warning");
+  }
+
+  const { error } = await supabase.rpc("join_class", {
+    p_code: code
+  });
+
+  if (error) {
+    return toast(error.message, "danger");
+  }
+
+  setEnrollCode("");
+  closeModal();
+  await reloadClasses();
+
+  toast("Successfully joined the class!");
+};
+
+
+  const submitCreate = async () => {
+  if (!isProf) {
+    return toast("Only professors can create new class sections.", "warning");
+  }
+  if (isPendingProf) {
+    return toast("Your professor account is pending admin approval.", "warning");
+  }
+  const title = createForm.title.trim();
+  if (!title) return toast("Please provide a subject title.", "warning");
+
+  const prefix =
+    title.replace(/[^A-Za-z]/g, "").substring(0, 3).toUpperCase() || "CLS";
+
+  try {
+    for (let i = 0; i < 5; i++) {
+      const code = `${prefix}-${Math.floor(100 + Math.random() * 899)}`;
+      const { error } = await supabase.from("classes").insert({
+        code,
+        subject_name: title,
+        section: createForm.section.trim() || "BSCS 3IS-1",
+        room: createForm.room.trim() || "Lab 305",
+        schedule: createForm.schedule.trim() || "Mon/Wed 1:00 PM - 2:30 PM",
+        description:
+          createForm.desc.trim() ||
+          "Academic course section exploring foundational principles and applied projects.",
+        professor_id: user.id,
+        professor_name: user.name,
+        professor_avatar: user.avatar,
+      });
+
+      if (!error) {
+        setCreateForm(EMPTY_CLASS_FORM);
+        closeModal();
+        await reloadClasses();
+        return toast(`Created section ${title}! Enrollment code: ${code}`);
+      }
+
+      console.error("Create class error:", error);
+      if (error.code !== "23505") {
+        return toast(`Create failed: ${error.message}`, "danger");
+      }
     }
-
-    const code = enrollCode.trim().toUpperCase();
-    if (!code) {
-      toast("Please enter a class code.", "warning");
-      return;
-    }
-
-    const { error } = await supabase.rpc("join_class", { class_code: code });
-    if (error) {
-      toast(error.message, "danger");
-      return;
-    }
-
-    await reloadClasses();
-    setEnrollCode("");
-    closeModal();
-    toast(`Successfully joined class ${code}!`);
-  };
-
-    const submitCreate = async () => {
-    if (user.role !== "professor" && user.role !== "admin") {
-      toast("Only professors can create new class sections.", "warning");
-      return;
-    }
-
-    if (isPendingProf) {
-      toast("Your professor account is pending admin approval.", "warning");
-      return;
-    }
-
-    const title = createForm.title.trim();
-    if (!title) {
-      toast("Please provide a subject title.", "warning");
-      return;
-    }
-
-    const prefix =
-      title
-        .replace(/[^A-Za-z]/g, "")
-        .substring(0, 3)
-        .toUpperCase() || "CLS";
-    const code = `${prefix}-${Math.floor(100 + Math.random() * 899)}`;
-
-    const { error } = await supabase.from("classes").insert({
-      code,
-      subject_name: title,
-      section: createForm.section.trim() || "BSCS 3IS-1",
-      room: createForm.room.trim() || "Lab 305",
-      schedule: createForm.schedule.trim() || "Mon/Wed 1:00 PM - 2:30 PM",
-      description:
-        createForm.desc.trim() ||
-        "Academic course section exploring foundational principles and applied projects.",
-      professor_id: user.id,
-      professor_name: user.name,
-      professor_avatar: user.avatar,
-    });
-
-    if (error) {
-      toast(
-        error.code === "23505"
-          ? "That class code is already taken. Please click create again."
-          : error.message,
-        "danger",
-      );
-      return;
-    }
-
-    await reloadClasses();
-    setCreateForm(EMPTY_CLASS_FORM);
-    closeModal();
-    toast(`Created section ${title}! Enrollment code: ${code}`);
-  };
-
+    toast("Could not generate a unique code. Try again.", "danger");
+  } catch (err) {
+    console.error(err);
+    toast(`Unexpected error: ${err.message}`, "danger");
+  }
+};
   const setCreateField = (field) => (e) =>
     setCreateForm((prev) => ({ ...prev, [field]: e.target.value }));
 
@@ -1901,8 +1900,8 @@ function HomePage() {
           </h3>
           <p className="text-muted text-sm max-w-[480px] mx-auto mb-5">
             {isStudent
-              ? 'Click "+ Join Class" and enter an instructor-provided code (such as AUT-305 or NET-310) to access your class page.'
-              : 'Click "+ Create Class" to establish a new section and generate a 6-character code for your students.'}
+              ? 'Click "+ Join Class" and enter the code your instructor gave you to access your class page.'
+              : 'Click "+ Create Class" to establish a new section and generate an enrollment code for your students.'}
           </p>
           {isStudent && (
             <button
@@ -1950,7 +1949,7 @@ function HomePage() {
         open={modal === "enroll"}
         onClose={closeModal}
         title="Join Class Section"
-        subtitle="Enter the 6-character course code provided by your instructor"
+        subtitle="Enter the course code provided by your instructor"
         footer={
           <>
             <button
@@ -1977,18 +1976,9 @@ function HomePage() {
             value={enrollCode}
             onChange={(e) => setEnrollCode(e.target.value)}
             maxLength={10}
-            placeholder="e.g. AUT-305, NET-310, IS-306"
+            placeholder="e.g. CMS-482"
             className={`${formInputClass} uppercase font-mono !text-base tracking-[1px]`}
           />
-          <div className="text-xs text-muted mt-1.5">
-            Available demo codes:{" "}
-            {["AUT-305", "NET-310", "IS-306", "PM-309"].map((c, i) => (
-              <span key={c}>
-                <code className="text-accent">{c}</code>
-                {i < 3 ? ", " : ""}
-              </span>
-            ))}
-          </div>
         </div>
 
         <div className="bg-card-inner border border-line rounded-lg p-3.5">
@@ -2263,9 +2253,7 @@ function ClassPage({ route }) {
 
   const classActivities = activities.filter((a) => a.classId === cls.id);
   const classMaterials = materials.filter((m) => m.classId === cls.id);
-  const enrolled = (cls.studentIds || [])
-    .map((id) => users.find((u) => u.id === id))
-    .filter(Boolean);
+  const enrolled = cls.students || [];
   const instructor = users.find((u) => u.id === cls.professorId);
 
   const reviewSub = submissions.find((s) => s.id === reviewId) || null;
@@ -2329,36 +2317,68 @@ function ClassPage({ route }) {
     );
   };
 
-  const submitActivity = () => {
-    const title = actForm.title.trim();
-    if (!title) {
-      toast("Please provide an activity title.", "warning");
-      return;
-    }
+console.log("Publishing activity to Supabase...", {
+  classId: cls.id,
+  title,
+});
 
-    const points = Math.min(
-      100,
-      Math.max(10, parseInt(actForm.points, 10) || 100),
-    );
-    const newAct = {
-      id: `act_${Date.now()}`,
-      classId: cls.id,
+const submitActivity = async () => {
+
+ console.log("SUBMIT ACTIVITY FUNCTION TRIGGERED");
+
+  const title = actForm.title.trim();
+
+  if (!title) {
+    toast("Please provide an activity title.", "warning");
+    return;
+  }
+
+  const points = Math.min(
+    100,
+    Math.max(10, parseInt(actForm.points, 10) || 100),
+  );
+
+  const { data, error } = await supabase
+    .from("activities")
+    .insert({
+      class_id: cls.id,
       title,
-      description:
+      instructions:
         actForm.instructions.trim() ||
         "Complete the assignment prompt in clear, structured prose.",
-      dueDate: actForm.due || "2026-11-20",
-      maxPoints: points,
-      rubric: "Conceptual rigor & clarity",
-      status: "open",
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+      due_date: actForm.due || null,
+      max_points: points,
+      rubic: "Conceptual rigor & clarity",
+    })
+    .select()
+    .single();
 
-    setActivities((prev) => [newAct, ...prev]);
-    setActForm(EMPTY_ACTIVITY_FORM);
-    closeModal();
-    toast(`Published activity "${title}"!`);
+     console.log("Supabase response:", { data, error });
+
+  if (error) {
+    console.error("Activity save error:", error);
+    toast(`Could not publish activity: ${error.message}`, "danger");
+    return;
+  }
+
+  const newAct = {
+    id: data.id,
+    classId: data.class_id,
+    title: data.title,
+    description: data.instructions,
+    dueDate: data.due_date,
+    maxPoints: data.max_points,
+    rubric: data.rubic,
+    status: "open",
+    createdAt: data.created_at,
   };
+
+  setActivities((prev) => [newAct, ...prev]);
+
+  setActForm(EMPTY_ACTIVITY_FORM);
+  closeModal();
+  toast(`Published activity "${title}"!`);
+};
 
   const submitMaterial = () => {
     const title = matForm.title.trim();
@@ -3018,6 +3038,7 @@ function ClassPage({ route }) {
               Cancel
             </button>
             <button
+            
               type="button"
               className={btn("primary")}
               onClick={submitActivity}
@@ -4902,10 +4923,7 @@ function App() {
   const [theme, setTheme] = usePersistedState(STORAGE_KEYS.THEME, "dark");
   const [users, setUsers] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [activities, setActivities] = usePersistedState(
-    STORAGE_KEYS.ACTIVITIES,
-    INITIAL_ACTIVITIES,
-  );
+  const [activities, setActivities] = useState([]);
   const [materials, setMaterials] = usePersistedState(
     STORAGE_KEYS.MATERIALS,
     INITIAL_MATERIALS,
@@ -4937,15 +4955,54 @@ function App() {
       setClasses([]);
       return;
     }
+const reloadActivities = useCallback(async () => {
+  if (!session) {
+    setActivities([]);
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("activities")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Activities load error:", error);
+    toast(`Could not load activities: ${error.message}`, "danger");
+    return;
+  }
+
+  setActivities(
+    (data || []).map((a) => ({
+      id: a.id,
+      classId: a.class_id,
+      title: a.title,
+      description: a.instructions,
+      dueDate: a.due_date,
+      maxPoints: a.max_points,
+      rubric: a.rubic,
+      status: "open",
+      createdAt: a.created_at,
+    })),
+  );
+}, [session, toast]);
+
     const { data, error } = await supabase
-      .from("classes")
-      .select("*, enrollments(student_id, profiles(full_name, username, email, avatar_url))")
-      .order("created_at", { ascending: false });
-    if (error) {
-      console.error("Classes load error:", error);
-      toast(`Could not load classes: ${error.message}`, "danger");
-      return;
-    }
+  .from("activities")
+  .insert({
+    class_id: cls.id,
+    title: title,
+    instructions: actForm.instructions,
+    due_date: actForm.due || null,
+    max_points: points,
+    rubic: "Conceptual rigor & clarity"
+  })
+  .select()
+  .single();
+
+if (error) {
+  return toast(error.message, "danger");
+}
     setClasses((data || []).map(mapClass));
   }, [session, toast]);
 
@@ -4953,7 +5010,10 @@ function App() {
     reloadClasses();
   }, [reloadClasses]);
 
-  
+  useEffect(() => {
+  reloadActivities();
+}, [reloadActivities]);
+
     // Restore the session on page load and listen for sign in / sign out
   useEffect(() => {
     let active = true;
