@@ -11,7 +11,7 @@ const STORAGE_KEYS = {
   ACTIVITIES: 'tagadetect_activities',
   SUBMISSIONS: 'tagadetect_submissions',
   MATERIALS: 'tagadetect_materials',
-  FEEDBACK: 'tagadetect_ai_feedback',
+  FEEDBACK: 'tagadetect_ai_feedback_v2',
   SETTINGS: 'tagadetect_settings'
 };
 
@@ -520,32 +520,7 @@ const INITIAL_SUBMISSIONS = [
 ];
 
 // Seed AI Detector Feedback
-const INITIAL_AI_FEEDBACK = [
-  {
-    id: 'fb_1',
-    userId: 'usr_student_1',
-    userName: 'Alex Rivera',
-    userRole: 'student',
-    timestamp: '2026-11-10T15:00:00Z',
-    detectedScore: 72,
-    accuracyRating: 'partially_accurate',
-    feedbackType: 'False Positive Flags',
-    comment: 'The concluding sentence was flagged as 88% AI, but I drafted that summary based on my lecture slides. The first paragraph indeed used phrasing from an AI outline.',
-    status: 'Reviewed'
-  },
-  {
-    id: 'fb_2',
-    userId: 'usr_prof_1',
-    userName: 'Kristine Kaye Arida',
-    userRole: 'professor',
-    timestamp: '2026-11-12T11:20:00Z',
-    detectedScore: 9,
-    accuracyRating: 'highly_accurate',
-    feedbackType: 'Accurate Detection',
-    comment: 'Very accurate detection for Chloe Chen’s paper. Correctly identified human burstiness and distinctive metaphorical phrasing.',
-    status: 'Confirmed'
-  }
-];
+const INITIAL_AI_FEEDBACK = [];
 
 // State Store Manager
 class TagaStore {

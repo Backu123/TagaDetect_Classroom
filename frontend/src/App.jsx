@@ -40,7 +40,7 @@ const STORAGE_KEYS = {
   ACTIVITIES: "tagadetect_activities",
   SUBMISSIONS: "tagadetect_submissions",
   MATERIALS: "tagadetect_materials",
-  FEEDBACK: "tagadetect_ai_feedback",
+  FEEDBACK: "tagadetect_ai_feedback_v2",
 };
 
 const store = {
@@ -490,34 +490,7 @@ const INITIAL_SUBMISSIONS = [
   },
 ];
 
-const INITIAL_FEEDBACK = [
-  {
-    id: "fb_1",
-    userId: "usr_student_1",
-    userName: "Alex Rivera",
-    userRole: "student",
-    timestamp: "2026-11-10T15:00:00Z",
-    detectedScore: 72,
-    accuracyRating: "partially_accurate",
-    feedbackType: "False Positive Flags",
-    comment:
-      "The concluding sentence was flagged as 88% AI, but I drafted that summary based on my lecture slides. The first paragraph indeed used phrasing from an AI outline.",
-    status: "Reviewed",
-  },
-  {
-    id: "fb_2",
-    userId: "usr_prof_1",
-    userName: "Kristine Kaye Arida",
-    userRole: "professor",
-    timestamp: "2026-11-12T11:20:00Z",
-    detectedScore: 9,
-    accuracyRating: "highly_accurate",
-    feedbackType: "Accurate Detection",
-    comment:
-      "Very accurate detection for Chloe Chen's paper. Correctly identified human burstiness and distinctive metaphorical phrasing.",
-    status: "Confirmed",
-  },
-];
+const INITIAL_FEEDBACK = [];
 
 /* =====================================================================
    SECTION 3: DETECTOR ENGINE (from ai-engine.js, still shuffled)
@@ -887,20 +860,7 @@ function Navbar({ route }) {
       </nav>
 
       <div className="flex items-center gap-3.5">
-        {isLoggedIn && (
-          <select
-            value={user.id}
-            onChange={(e) => switchUser(e.target.value)}
-            title="Demo role switcher"
-            className="bg-card border border-line text-main px-3.5 py-[7px] rounded-full text-xs font-semibold cursor-pointer outline-none focus:border-accent max-lg:hidden"
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name} ({u.role})
-              </option>
-            ))}
-          </select>
-        )}
+
 
         <button
           type="button"
@@ -1077,27 +1037,88 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [legal, setLegal] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
+
+  // Lockout countdown timer
+  useEffect(() => {
+    if (lockoutTimer > 0) {
+      const interval = setInterval(() => setLockoutTimer((t) => t - 1), 1000);
+      return () => clearInterval(interval);
+    }
+  }, [lockoutTimer]);
 
   const handleGoogle = async () => {
+    setIsSubmitting(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
     });
-    if (error) toast(error.message, "danger");
+    if (error) {
+      toast(error.message, "danger");
+      setIsSubmitting(false);
+    }
   };
 
   const handleEmailLogin = async (e) => {
     e.preventDefault();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    if (error) {
-      toast(error.message, "danger");
+
+    if (lockoutTimer > 0) {
+      toast(`Too many failed attempts. Please wait ${lockoutTimer}s.`, "warning");
       return;
     }
-    toast("Welcome back!");
-    navigate("");
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !password) {
+      toast("Please enter both email and password.", "warning");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
+
+      if (error) {
+        const nextAttempts = attempts + 1;
+        setAttempts(nextAttempts);
+
+        if (nextAttempts >= 5) {
+          setLockoutTimer(30);
+          setAttempts(0);
+          toast("Too many failed attempts. Login locked for 30 seconds.", "danger");
+        } else {
+          toast("Invalid credentials or unconfirmed account.", "danger");
+        }
+        return;
+      }
+
+      // Check account approval status if professor
+      if (data?.user) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("status, role")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (prof?.role === "professor" && prof?.status === "pending") {
+          toast("Notice: Your professor account is pending admin verification.", "warning");
+        } else {
+          toast("Welcome back!");
+        }
+      }
+
+      setAttempts(0);
+      navigate("");
+    } catch (err) {
+      toast("An unexpected connection error occurred.", "danger");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   return (
     <>
@@ -1113,6 +1134,7 @@ function LoginPage() {
         <button
           type="button"
           onClick={handleGoogle}
+          disabled={isSubmitting}
           className={btn("secondary", "w-full !py-2.5 !text-[13px] mb-5")}
         >
           <GoogleIcon />
@@ -1127,6 +1149,7 @@ function LoginPage() {
             <input
               type="email"
               required
+              disabled={isSubmitting || lockoutTimer > 0}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="e.g. alex.rivera@tagadetect.edu"
@@ -1153,6 +1176,7 @@ function LoginPage() {
             <input
               type="password"
               required
+              disabled={isSubmitting || lockoutTimer > 0}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••••••"
@@ -1162,9 +1186,14 @@ function LoginPage() {
 
           <button
             type="submit"
+            disabled={isSubmitting || lockoutTimer > 0}
             className={btn("primary", "w-full !py-2.5 mt-2")}
           >
-            Sign In
+            {isSubmitting
+              ? "Signing in..."
+              : lockoutTimer > 0
+              ? `Locked (${lockoutTimer}s)`
+              : "Sign In"}
           </button>
         </form>
 
@@ -1751,13 +1780,7 @@ function HomePage() {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              className={btn("secondary", "!text-xs !px-3.5 !py-1.5")}
-              onClick={() => switchUser("usr_admin")}
-            >
-              Switch to Admin to Approve
-            </button>
+
           </div>
         </div>
       )}
@@ -3473,6 +3496,7 @@ function DetectorPage() {
                 Give Feedback <Icon name="feedback" size={14} />
               </button>
             )}
+
           </div>
 
           {!result ? (
@@ -3589,40 +3613,41 @@ function DetectorPage() {
         </div>
 
         <div className="flex flex-col gap-2.5">
-          {feedback.length === 0 && (
+          {feedback.length === 0 ? (
             <p className="text-sm text-muted">
               No feedback has been submitted yet.
             </p>
-          )}
-          {feedback.slice(0, 5).map((fb) => (
-            <div
-              key={fb.id}
-              className="bg-card-inner border border-line rounded-lg px-4 py-3"
-            >
-              <div className="flex justify-between items-center flex-wrap gap-2 mb-1.5">
-                <div className="flex items-center gap-2">
-                  <strong className="text-[13px] text-main">
-                    {fb.userName}
-                  </strong>
-                  <span
-                    className={badge(
-                      fb.userRole === "professor" ? "ai" : "human",
-                      "!text-[9px] !px-1.5 !py-0.5",
-                    )}
-                  >
-                    {fb.userRole}
-                  </span>
-                  <span className="text-[11px] text-muted">
-                    • {new Date(fb.timestamp).toLocaleDateString()}
+          ) : (
+            feedback.filter((fb) => !["fb_1", "fb_2"].includes(fb.id)).slice(0, 5).map((fb) => (
+              <div
+                key={fb.id}
+                className="bg-card-inner border border-line rounded-lg px-4 py-3"
+              >
+                <div className="flex justify-between items-center flex-wrap gap-2 mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <strong className="text-[13px] text-main">
+                      {fb.userName}
+                    </strong>
+                    <span
+                      className={badge(
+                        fb.userRole === "professor" ? "ai" : "human",
+                        "!text-[9px] !px-1.5 !py-0.5",
+                      )}
+                    >
+                      {fb.userRole}
+                    </span>
+                    <span className="text-[11px] text-muted">
+                      • {new Date(fb.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase bg-accent/10 text-accent px-2 py-[3px] rounded-md">
+                    {fb.feedbackType}
                   </span>
                 </div>
-                <span className="text-[10px] font-bold uppercase bg-accent/10 text-accent px-2 py-[3px] rounded-md">
-                  {fb.feedbackType}
-                </span>
+                <p className="text-xs text-muted">"{fb.comment}"</p>
               </div>
-              <p className="text-xs text-muted">"{fb.comment}"</p>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
@@ -3774,51 +3799,47 @@ function HeroTag({ children }) {
 
 const ABOUT_FOUNDERS = [
   {
-    name: "Dr. Aris Thorne",
-    role: "Lead AI Architect & Co-Founder",
-    bio: "Pioneered early neural watermark detection and stylistic invariant analysis for educational software.",
-    avatar:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80",
+    name: "Timoth Rayjell E. Audije",
+    role: "Backend Developer & Machine Learning Lead",
+    bio: "Leads the backend architecture and machine learning pipeline powering TagaDetect's heuristic AI analysis engine.",
+    initial: "T",
     work: [
-      "Token Shuffling Engine",
-      "Perplexity Invariant Math",
-      "Burstiness Cadence Models",
+      "Machine Learning Engine",
+      "Backend API Development",
+      "Heuristic Detection Models",
     ],
   },
   {
-    name: "Elena Rostova, Ph.D.",
-    role: "Head of Pedagogy & Co-Founder",
-    bio: "Curriculum architect and advocate for transparent, non-punitive academic integrity tools.",
-    avatar:
-      "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80",
+    name: "John Wayne M. Capistrano",
+    role: "Design & Frontend Developer",
+    bio: "Crafts the visual identity and user interface of TagaDetect, ensuring an intuitive and accessible experience for all users.",
+    initial: "J",
     work: [
-      "Automated Review Pipeline",
-      "Context-Aware Rubric Engine",
-      "Student-Professor Dual View",
+      "UI/UX Design System",
+      "Frontend Development",
+      "Component Architecture",
     ],
   },
   {
-    name: "Kaelen Vance",
-    role: "Chief Product Engineer & Co-Founder",
-    bio: "Systems specialist developing high-throughput web applications with secure cloud credentialing.",
-    avatar:
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80",
+    name: "Leilanie Alaine M. Cristobal",
+    role: "Backend Developer & Documenter",
+    bio: "Develops core backend systems and maintains comprehensive technical documentation for the TagaDetect platform.",
+    initial: "L",
     work: [
-      "High-Performance LMS Core",
-      "Google OAuth Integration Layer",
-      "Encrypted Activity Storage",
+      "Backend Systems",
+      "Technical Documentation",
+      "Data Management",
     ],
   },
   {
-    name: "Maya Lin-Patel",
-    role: "Head of Design & Ethics & Co-Founder",
-    bio: "Human-Centered UI/UX researcher creating intuitive academic tools that prioritize student empowerment.",
-    avatar:
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80",
+    name: "Gabriel M. Samaniego",
+    role: "Frontend Developer & Documenter",
+    bio: "Implements frontend features and contributes to the platform's documentation, ensuring clarity and consistency throughout.",
+    initial: "G",
     work: [
-      "Dark Minimalist SaaS UI",
-      "Sentence Highlight Engine",
-      "User Feedback Audit Portal",
+      "Frontend Implementation",
+      "Project Documentation",
+      "UI Integration",
     ],
   },
 ];
@@ -3907,11 +3928,17 @@ function AboutPage() {
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(270px,100%),1fr))] gap-6">
           {ABOUT_FOUNDERS.map((f) => (
             <div key={f.name} className={`${cardClass} !p-6 text-center`}>
-              <img
-                src={f.avatar}
-                alt={f.name}
-                className="w-20 h-20 rounded-full object-cover mx-auto mb-3.5 border-[3px] border-accent"
-              />
+              {f.avatar ? (
+                <img
+                  src={f.avatar}
+                  alt={f.name}
+                  className="w-20 h-20 rounded-full object-cover mx-auto mb-3.5 border-[3px] border-accent"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-card-inner border-[3px] border-accent mx-auto mb-3.5 flex items-center justify-center text-[28px] font-extrabold text-accent">
+                  {f.initial || f.name.charAt(0)}
+                </div>
+              )}
               <h3 className="text-[17px] font-bold text-main">{f.name}</h3>
               <div className="text-xs font-semibold text-accent mb-2.5">
                 {f.role}
@@ -4702,31 +4729,7 @@ function AdminPage() {
         </p>
       </div>
 
-      {!isAdmin && (
-        <div className="bg-accent/10 border border-accent rounded-[14px] px-6 py-[18px] mb-7">
-          <div className="flex justify-between items-center flex-wrap gap-3.5">
-            <div className="flex items-center gap-3.5">
-              <Icon name="lock" size={30} />
-              <div>
-                <h3 className="text-[15px] font-bold text-main">
-                  Viewing as Non-Admin
-                </h3>
-                <p className="text-[13px] text-muted mt-0.5">
-                  You are currently viewing with another role. Switch to Admin
-                  Eleanor Sterling to approve or reject pending professors.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              className={btn("primary")}
-              onClick={() => switchUser("usr_admin")}
-            >
-              Switch to Admin (Eleanor) <Icon name="shield" size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Pending queue */}
       <div className={`${cardClass} !p-[26px] mb-8`}>
