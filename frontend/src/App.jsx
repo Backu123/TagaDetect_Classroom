@@ -4950,11 +4950,26 @@ function App() {
   }, []);
 
     // Load the classes this user is allowed to see (RLS filters them)
-  const reloadClasses = useCallback(async () => {
-    if (!session) {
-      setClasses([]);
-      return;
-    }
+ const reloadClasses = useCallback(async () => {
+  if (!session) {
+    setClasses([]);
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("classes")
+    .select("*, enrollments(student_id, profiles(full_name, username, email, avatar_url))")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Classes load error:", error);
+    toast(`Could not load classes: ${error.message}`, "danger");
+    return;
+  }
+
+  setClasses((data || []).map(mapClass));
+}, [session, toast]);
+
 const reloadActivities = useCallback(async () => {
   if (!session) {
     setActivities([]);
