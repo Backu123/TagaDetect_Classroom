@@ -1588,7 +1588,7 @@ function HomePage() {
   const {
     user,
     classes,
-    setClasses,
+    reloadClasses,
     activities,
     materials,
     toast,
@@ -4677,17 +4677,21 @@ function AdminPage() {
     (u) => u.role === "professor" && u.status === "pending",
   );
 
-  const approve = (target) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === target.id ? { ...u, status: "approved" } : u)),
-    );
-    toast(`Approved ${target.name}! Faculty permissions now active.`);
-  };
+  const approve = async (target) => {
+  const { error } = await supabase.rpc("set_professor_status",
+    { target: target.id, new_status: "approved", reason: null });
+  if (error) return toast(error.message, "danger");
+  setUsers((prev) => prev.map((u) => u.id === target.id ? { ...u, status: "approved" } : u));
+  toast(`Approved ${target.name}! Faculty permissions now active.`);
+};
 
-  const reject = (target) => {
-    setUsers((prev) => prev.filter((u) => u.id !== target.id));
-    toast(`Registration request for ${target.name} rejected.`, "warning");
-  };
+  const reject = async (target) => {
+  const { error } = await supabase.rpc("set_professor_status",
+    { target: target.id, new_status: "rejected", reason: null });
+  if (error) return toast(error.message, "danger");
+  setUsers((prev) => prev.map((u) => u.id === target.id ? { ...u, status: "rejected" } : u));
+  toast(`Registration for ${target.name} rejected.`, "warning");
+};
 
   return (
     <div>
@@ -4878,6 +4882,21 @@ const PAGES = {
   admin: AdminPage,
 };
 
+// Converts a row from the classes table into the shape the app uses
+const mapClass = (c) => ({
+  id: c.id,
+  code: c.code,
+  subjectName: c.subject_name,
+  section: c.section,
+  room: c.room,
+  schedule: c.schedule,
+  description: c.description,
+  professorId: c.professor_id,
+  professorName: c.professor_name,
+  professorAvatar: c.professor_avatar,
+  studentIds: (c.enrollments || []).map((e) => e.student_id),
+});
+
 /* =====================================================================
    SECTION 6: APP (holds all the data and decides which page to show)
    ===================================================================== */
@@ -4886,14 +4905,8 @@ function App() {
   const route = useRoute();
 
   const [theme, setTheme] = usePersistedState(STORAGE_KEYS.THEME, "dark");
-  const [users, setUsers] = usePersistedState(
-    STORAGE_KEYS.USERS,
-    INITIAL_USERS,
-  );
-  const [classes, setClasses] = usePersistedState(
-    STORAGE_KEYS.CLASSES,
-    INITIAL_CLASSES,
-  );
+  const [users, setUsers] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [activities, setActivities] = usePersistedState(
     STORAGE_KEYS.ACTIVITIES,
     INITIAL_ACTIVITIES,
@@ -4915,19 +4928,70 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Restore the session on page load and listen for sign in / sign out
+  const toast = useCallback((message, type = "success") => {
+  const id = Date.now() + Math.random();
+  setToasts((prev) => [...prev, { id, message, type }]);
+  setTimeout(() => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, 3200);
+  }, []);
+
+    // Load the classes this user is allowed to see (RLS filters them)
+  const reloadClasses = useCallback(async () => {
+    if (!session) {
+      setClasses([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("classes")
+      .select("*, enrollments(student_id)")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Classes load error:", error);
+      toast(`Could not load classes: ${error.message}`, "danger");
+      return;
+    }
+    setClasses((data || []).map(mapClass));
+  }, [session, toast]);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (!data.session) setAuthLoading(false);
-    });
+    reloadClasses();
+  }, [reloadClasses]);
+
+  
+    // Restore the session on page load and listen for sign in / sign out
+  useEffect(() => {
+    let active = true;
+
+    // Safety net: never stay on a blank screen forever
+    const timer = setTimeout(() => {
+      if (active) setAuthLoading(false);
+    }, 4000);
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+        if (!data.session) setAuthLoading(false);
+      })
+      .catch((err) => {
+        console.error("getSession failed:", err);
+        if (active) setAuthLoading(false);
+      });
+
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
         if (newSession) setAuthLoading(true);
         setSession(newSession);
       },
     );
-    return () => listener.subscription.unsubscribe();
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   // Load the profile row that belongs to the signed in user
@@ -4958,6 +5022,31 @@ function App() {
       cancelled = true;
     };
   }, [session]);
+
+    // Load all accounts from the profiles table.
+  // Admins get every row; everyone else only gets their own (set by RLS).
+  useEffect(() => {
+    if (!session) {
+      setUsers([]);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("*")
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Users load error:", error);
+          return;
+        }
+        setUsers(
+          (data || []).map((p) => ({
+            ...p,
+            name: p.full_name || p.username || p.email || "User",
+            avatar: p.avatar_url,
+          })),
+        );
+      });
+  }, [session, profile?.status, profile?.role]);
 
   // Same shape the rest of your app already expects
   const user = profile
@@ -4990,14 +5079,7 @@ function App() {
     if (blocked) navigate("login");
   }, [blocked]);
 
-  const toast = useCallback((message, type = "success") => {
-    const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3200);
-  }, []);
-
+  
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -5019,12 +5101,12 @@ function App() {
     toast("Signed out successfully.", "info");
     navigate("login");
   };
-  const ctx = {
+    const ctx = {
     user,
     users,
     setUsers,
     classes,
-    setClasses,
+    reloadClasses,
     activities,
     setActivities,
     materials,
