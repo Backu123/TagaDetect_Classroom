@@ -626,9 +626,34 @@ function predictShuffle(text) {
   };
 }
 
-// Runs automatically when a student passes an activity
-function generateSubmissionReview(text) {
+// Sends text to the Python ML Inference API (/api/detect) with fallback to heuristics
+async function predictWithBackend(text) {
+  if (!text || text.trim().length < 15) {
+    return predictShuffle(text);
+  }
+  const endpoints = ["/api/detect", "http://localhost:8080/api/detect"];
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        data.generatedAt = new Date().toISOString();
+        return data;
+      }
+    } catch {
+      // try next endpoint
+    }
+  }
   return predictShuffle(text);
+}
+
+// Runs automatically when a student passes an activity
+async function generateSubmissionReview(text) {
+  return await predictWithBackend(text);
 }
 
 /* =====================================================================
@@ -2322,7 +2347,7 @@ function ClassPage({ route }) {
     setModal("pass");
   };
 
-  const submitPass = () => {
+  const submitPass = async () => {
     if (!passActivity) return;
     const text = passText.trim();
     if (text.length < 30) {
@@ -2333,7 +2358,7 @@ function ClassPage({ route }) {
       return;
     }
 
-    const aiReview = generateSubmissionReview(text);
+    const aiReview = await predictWithBackend(text);
     const newSub = {
       id: `sub_${Date.now()}`,
       activityId: passActivity.id,
@@ -3321,12 +3346,16 @@ function DetectorPage() {
     }
 
     setAnalyzing(true);
-    setTimeout(() => {
+    predictWithBackend(input).then((res) => {
+      setResult(res);
+      setAnalyzing(false);
+      toast(`Analysis complete: ${res.verdict}!`);
+    }).catch(() => {
       const res = predictShuffle(input);
       setResult(res);
       setAnalyzing(false);
       toast(`Analysis complete: ${res.verdict}!`);
-    }, 400);
+    });
   };
 
   const loadSample = (type) => {
@@ -3584,6 +3613,28 @@ function DetectorPage() {
                 tone="rose"
                 maxHeight={220}
               />
+
+              {result.isRealModel && (
+                <div className="mt-4 p-3 bg-card-inner border border-line rounded-lg text-xs text-muted">
+                  <div className="flex justify-between items-center mb-1.5 flex-wrap gap-2">
+                    <span className="font-bold text-accent text-[11px] uppercase tracking-wider">
+                      ✦ Engine: TagaDetect ML Pipeline (Live)
+                    </span>
+                    {result.likelySource && (
+                      <span className="inline-flex items-center text-[10px] font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded">
+                        Source: {result.likelySource}
+                      </span>
+                    )}
+                  </div>
+                  {result.flags && result.flags.length > 0 && (
+                    <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-muted">
+                      {result.flags.map((f, i) => (
+                        <li key={i}>{f}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

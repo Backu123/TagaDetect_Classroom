@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TagaDetect - Application Controller with Dedicated Class Pages
  * - Dedicated Class Page with 3 visualization tabs:
  *   1. Activities & Submissions (with automated AI reviews upon passing)
@@ -33,7 +33,7 @@ class TagaApp {
     document.documentElement.setAttribute('data-theme', theme);
     const themeBtn = document.getElementById('theme-toggle-btn');
     if (themeBtn) {
-      themeBtn.innerHTML = theme === 'dark' ? '☀️' : '🌙';
+      themeBtn.innerHTML = theme === 'dark' ? 'â˜€ï¸' : 'ðŸŒ™';
       themeBtn.title = `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`;
     }
   }
@@ -233,7 +233,7 @@ class TagaApp {
           <div class="card" style="border: 1px solid var(--accent-rose); background: rgba(244, 63, 94, 0.08); margin-bottom: 32px; padding: 20px 24px;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
               <div style="display: flex; align-items: center; gap: 14px;">
-                <span style="font-size: 28px;">⏳</span>
+                <span style="font-size: 28px;">â³</span>
                 <div>
                   <h3 style="font-size: 16px; font-weight: 700; color: var(--accent-rose);">Professor Account Pending Administrative Verification</h3>
                   <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
@@ -252,7 +252,7 @@ class TagaApp {
         <section class="hero-clean">
           <div>
             <div class="hero-tag">
-              <span>✦</span> ${isStudent ? 'STUDENT PORTAL' : (isProf ? 'PROFESSOR PORTAL' : 'ADMINISTRATOR PORTAL')}
+              <span>âœ¦</span> ${isStudent ? 'STUDENT PORTAL' : (isProf ? 'PROFESSOR PORTAL' : 'ADMINISTRATOR PORTAL')}
             </div>
             <h1 class="hero-title">
               ${isStudent 
@@ -347,7 +347,7 @@ class TagaApp {
         <!-- 3-Column Classes Grid -->
         ${visibleClasses.length === 0 ? `
           <div class="card" style="text-align: center; padding: 48px;">
-            <div style="font-size: 38px; margin-bottom: 12px;">${isStudent ? '🎒' : '📚'}</div>
+            <div style="font-size: 38px; margin-bottom: 12px;">${isStudent ? 'ðŸŽ’' : 'ðŸ“š'}</div>
             <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">
               ${isStudent ? 'No Enrolled Classes Found' : 'No Classes Handled Yet'}
             </h3>
@@ -383,16 +383,16 @@ class TagaApp {
                       <img src="${cls.professorAvatar || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150'}" class="clean-instructor-img" />
                       <div>
                         <div class="clean-instructor-name">${cls.professorName}</div>
-                        <div class="clean-instructor-sub">${cls.room} • ${cls.schedule}</div>
+                        <div class="clean-instructor-sub">${cls.room} â€¢ ${cls.schedule}</div>
                       </div>
                     </div>
                   </div>
 
                   <div class="clean-card-bottom">
                     <span class="clean-activity-pill">
-                      <span>📝</span> ${classActivities.length} Activities • <span>📁</span> ${classMaterials.length} Materials
+                      <span>ðŸ“</span> ${classActivities.length} Activities â€¢ <span>ðŸ“</span> ${classMaterials.length} Materials
                     </span>
-                    <span class="clean-arrow-btn">Open Class Page →</span>
+                    <span class="clean-arrow-btn">Open Class Page â†’</span>
                   </div>
                 </div>
               `;
@@ -447,12 +447,12 @@ class TagaApp {
         <div class="class-page-header">
           <div class="class-page-top-bar">
             <a class="class-back-btn" onclick="window.tagaApp.selectedClassId = null; window.tagaApp.renderPage(window.tagaApp.currentPage);">
-              <span>←</span> Back to All Classes
+              <span>â†</span> Back to All Classes
             </a>
 
             <div style="display: flex; align-items: center; gap: 10px;">
               <span class="badge badge-ai" style="font-size: 13px; padding: 6px 14px; cursor: pointer;" onclick="window.tagaApp.copyCode('${cls.code}')" title="Click to copy Class Code">
-                Class Code: <strong>${cls.code}</strong> 📋
+                Class Code: <strong>${cls.code}</strong> ðŸ“‹
               </span>
               ${isProf ? `
                 <button class="btn btn-primary" style="padding: 7px 16px; font-size: 13px;" onclick="window.tagaApp.openCreateActivityModal('${cls.id}')">
@@ -471,23 +471,23 @@ class TagaApp {
           <div class="class-page-section-text">${cls.section}</div>
 
           <div class="class-page-meta-row">
-            <span>👨‍🏫 <strong>${cls.professorName}</strong></span>
-            <span>📍 ${cls.room}</span>
-            <span>⏰ ${cls.schedule}</span>
-            <span>👥 ${enrolledStudents.length} Students Enrolled</span>
+            <span>ðŸ‘¨â€ðŸ« <strong>${cls.professorName}</strong></span>
+            <span>ðŸ“ ${cls.room}</span>
+            <span>â° ${cls.schedule}</span>
+            <span>ðŸ‘¥ ${enrolledStudents.length} Students Enrolled</span>
           </div>
         </div>
 
         <!-- Class Page Navigation Sub-Tabs -->
         <div class="class-subtabs-nav">
           <button class="class-tab-btn ${this.currentClassTab === 'activities' ? 'active' : ''}" onclick="window.tagaApp.switchClassTab('activities')">
-            <span>📝</span> Activities & Passing (${activities.length})
+            <span>ðŸ“</span> Activities & Passing (${activities.length})
           </button>
           <button class="class-tab-btn ${this.currentClassTab === 'materials' ? 'active' : ''}" onclick="window.tagaApp.switchClassTab('materials')">
-            <span>📁</span> Class Materials (${materials.length})
+            <span>ðŸ“</span> Class Materials (${materials.length})
           </button>
           <button class="class-tab-btn ${this.currentClassTab === 'people' ? 'active' : ''}" onclick="window.tagaApp.switchClassTab('people')">
-            <span>👥</span> People in Class (${enrolledStudents.length + 1})
+            <span>ðŸ‘¥</span> People in Class (${enrolledStudents.length + 1})
           </button>
         </div>
 
@@ -522,9 +522,9 @@ class TagaApp {
                           <h4 style="font-size: 18px; font-weight: 700; color: var(--text-main);">${act.title}</h4>
                           <p style="font-size: 14px; color: var(--text-muted); margin: 6px 0 12px; line-height: 1.6;">${act.description}</p>
                           <div style="display: flex; gap: 18px; font-size: 12px; color: var(--text-muted); flex-wrap: wrap;">
-                            <span>📅 Due: <strong>${act.dueDate}</strong></span>
-                            <span>🏆 Max Points: <strong>${act.maxPoints} pts</strong></span>
-                            <span>📋 Rubric: ${act.rubric}</span>
+                            <span>ðŸ“… Due: <strong>${act.dueDate}</strong></span>
+                            <span>ðŸ† Max Points: <strong>${act.maxPoints} pts</strong></span>
+                            <span>ðŸ“‹ Rubric: ${act.rubric}</span>
                           </div>
                         </div>
 
@@ -542,7 +542,7 @@ class TagaApp {
                               </div>
                             ` : `
                               <button class="btn btn-primary" onclick="window.tagaApp.openPassActivityModal('${act.id}', '${encodeURIComponent(act.title)}')">
-                                Submit Activity ✍️
+                                Submit Activity âœï¸
                               </button>
                             `}
                           ` : `
@@ -556,7 +556,7 @@ class TagaApp {
                         <div class="review-panel" style="margin-top: 16px;">
                           <div style="display: flex; align-items: center; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 10px;">
-                              <span style="font-size: 22px;">🤖</span>
+                              <span style="font-size: 22px;">ðŸ¤–</span>
                               <div>
                                 <strong style="font-size: 13px;">Automated Review Generated Upon Submission</strong>
                                 <div style="font-size: 12px; color: var(--text-muted);">
@@ -623,7 +623,7 @@ class TagaApp {
                                       </td>
                                       <td>
                                         <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 12px;" onclick="window.tagaApp.openGradeSubmissionModal('${sub.id}', '${encodeURIComponent(act.title)}', ${act.maxPoints})">
-                                          Grade 📝
+                                          Grade ðŸ“
                                         </button>
                                       </td>
                                     </tr>
@@ -672,10 +672,10 @@ class TagaApp {
                     </div>
                     <div class="material-footer">
                       <div>
-                        <span>📄 ${mat.type}</span> • <span>${mat.fileSize}</span>
+                        <span>ðŸ“„ ${mat.type}</span> â€¢ <span>${mat.fileSize}</span>
                       </div>
                       <button class="btn btn-secondary" style="padding: 5px 12px; font-size: 12px;" onclick="window.tagaApp.showToast('Downloaded ${mat.title}')">
-                        Download / View 📥
+                        Download / View ðŸ“¥
                       </button>
                     </div>
                   </div>
@@ -774,10 +774,10 @@ class TagaApp {
 
             <div style="display: flex; gap: 12px;">
               <button class="btn btn-primary" id="run-detection-btn" style="flex: 2;">
-                <span>⚡</span> Run AI Detection (Shuffle Prediction)
+                <span>âš¡</span> Run AI Detection (Shuffle Prediction)
               </button>
               <button class="btn btn-secondary" id="shuffle-rerun-btn" style="flex: 1;" title="Reshuffle model output">
-                <span>🔀</span> Reshuffle
+                <span>ðŸ”€</span> Reshuffle
               </button>
             </div>
 
@@ -800,7 +800,7 @@ class TagaApp {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
               <span style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Probability Gauge</span>
               <button class="btn btn-secondary" id="open-feedback-btn" style="padding: 5px 12px; font-size: 12px;">
-                <span>💬</span> Feedback
+                <span>ðŸ’¬</span> Feedback
               </button>
             </div>
 
@@ -845,9 +845,9 @@ class TagaApp {
                 Help us calibrate the upcoming custom Machine Learning detection engine:
               </p>
               <div style="display: flex; gap: 8px;">
-                <button class="btn btn-secondary" id="quick-feedback-accurate" style="flex: 1; padding: 6px; font-size: 11px;">👍 Accurate</button>
-                <button class="btn btn-secondary" id="quick-feedback-fp" style="flex: 1; padding: 6px; font-size: 11px;">⚠️ False +</button>
-                <button class="btn btn-secondary" id="quick-feedback-fn" style="flex: 1; padding: 6px; font-size: 11px;">❌ False -</button>
+                <button class="btn btn-secondary" id="quick-feedback-accurate" style="flex: 1; padding: 6px; font-size: 11px;">ðŸ‘ Accurate</button>
+                <button class="btn btn-secondary" id="quick-feedback-fp" style="flex: 1; padding: 6px; font-size: 11px;">âš ï¸ False +</button>
+                <button class="btn btn-secondary" id="quick-feedback-fn" style="flex: 1; padding: 6px; font-size: 11px;">âŒ False -</button>
               </div>
             </div>
           </div>
@@ -936,55 +936,84 @@ class TagaApp {
     if (sentEl) sentEl.textContent = sentences;
   }
 
-  executeDetection(text) {
+  async executeDetection(text) {
     if (!text || text.trim().length < 15) {
       this.showToast('Please enter at least 15 characters to analyze', 'error');
       return;
     }
 
-    const result = AI_DETECTOR_ENGINE.predictShuffle(text);
-    this.lastDetectionResult = result;
+    const analyzeBtn = document.querySelector('[data-action="analyze-detector"]') || document.getElementById('btn-analyze');
+    if (analyzeBtn) {
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = 'Analyzing... ⏳';
+    }
 
-    const score = result.overallAiScore;
-    const scoreText = document.getElementById('gauge-score-text');
-    const gaugeFill = document.getElementById('gauge-progress');
-    const verdictBadge = document.getElementById('verdict-badge');
-    const perplexityVal = document.getElementById('perplexity-val');
-    const perplexityBar = document.getElementById('perplexity-bar');
-    const burstinessVal = document.getElementById('burstiness-val');
-    const burstinessBar = document.getElementById('burstiness-bar');
-    const sentenceContainer = document.getElementById('sentence-breakdown-container');
+    try {
+      const result = await AI_DETECTOR_ENGINE.predict(text);
+      this.lastDetectionResult = result;
 
-    if (scoreText) scoreText.textContent = `${score}%`;
+      const score = result.overallAiScore;
+      const scoreText = document.getElementById('gauge-score-text');
+      const gaugeFill = document.getElementById('gauge-progress');
+      const verdictBadge = document.getElementById('verdict-badge');
+      const perplexityVal = document.getElementById('perplexity-val');
+      const perplexityBar = document.getElementById('perplexity-bar');
+      const burstinessVal = document.getElementById('burstiness-val');
+      const burstinessBar = document.getElementById('burstiness-bar');
+      const sentenceContainer = document.getElementById('sentence-breakdown-container');
 
-    if (gaugeFill) {
-      const maxOffset = 471;
-      const offset = maxOffset - (maxOffset * (score / 100));
-      gaugeFill.style.strokeDashoffset = offset;
-      if (score >= 70) {
-        gaugeFill.style.stroke = 'var(--accent-purple)';
-      } else if (score >= 40) {
-        gaugeFill.style.stroke = 'var(--accent-amber)';
-      } else {
-        gaugeFill.style.stroke = 'var(--accent-emerald)';
+      if (scoreText) scoreText.textContent = `${score}%`;
+
+      if (gaugeFill) {
+        const maxOffset = 471;
+        const offset = maxOffset - (maxOffset * (score / 100));
+        gaugeFill.style.strokeDashoffset = offset;
+        if (score >= 70) {
+          gaugeFill.style.stroke = 'var(--accent-purple)';
+        } else if (score >= 40) {
+          gaugeFill.style.stroke = 'var(--accent-amber)';
+        } else {
+          gaugeFill.style.stroke = 'var(--accent-emerald)';
+        }
       }
-    }
 
-    if (verdictBadge) {
-      verdictBadge.textContent = result.verdict;
-      verdictBadge.className = 'badge ' + (score >= 70 ? 'badge-ai' : (score >= 40 ? 'badge-mixed' : 'badge-human'));
-    }
+      if (verdictBadge) {
+        verdictBadge.textContent = result.verdict;
+        verdictBadge.className = 'badge ' + (score >= 70 ? 'badge-ai' : (score >= 40 ? 'badge-mixed' : 'badge-human'));
+      }
 
-    if (perplexityVal) perplexityVal.textContent = `${result.perplexityScore} / 100`;
-    if (perplexityBar) perplexityBar.style.width = `${result.perplexityScore}%`;
+      if (perplexityVal) perplexityVal.textContent = `${result.perplexityScore} / 100`;
+      if (perplexityBar) perplexityBar.style.width = `${result.perplexityScore}%`;
 
-    if (burstinessVal) burstinessVal.textContent = `${result.burstinessScore} / 100`;
-    if (burstinessBar) burstinessBar.style.width = `${result.burstinessScore}%`;
+      if (burstinessVal) burstinessVal.textContent = `${result.burstinessScore} / 100`;
+      if (burstinessBar) burstinessBar.style.width = `${result.burstinessScore}%`;
 
-    if (sentenceContainer) {
-      sentenceContainer.innerHTML = result.sentenceBreakdown.map(s => {
-        return `<span class="hl-sentence ${s.label}" title="${s.score}% AI">${s.text} </span>`;
-      }).join('');
+      if (sentenceContainer) {
+        sentenceContainer.innerHTML = result.sentenceBreakdown.map(s => {
+          return `<span class="hl-sentence ${s.label}" title="${s.score}% AI">${s.text} </span>`;
+        }).join('');
+      }
+
+      let modelBadge = document.getElementById('app-detector-engine-badge');
+      if (!modelBadge && sentenceContainer) {
+        modelBadge = document.createElement('div');
+        modelBadge.id = 'app-detector-engine-badge';
+        modelBadge.style.cssText = 'margin-top: 12px; font-size: 11px; color: var(--text-muted); padding: 8px 12px; background: var(--card-inner); border-radius: var(--radius-sm); border: 1px solid var(--border-color);';
+        sentenceContainer.parentNode.appendChild(modelBadge);
+      }
+      if (modelBadge) {
+        let txt = `Engine: <strong>${result.isRealModel ? 'TagaDetect ML Pipeline (Live)' : 'Heuristic Fallback'}</strong>`;
+        if (result.likelySource) txt += ` • Predicted Source: <strong>${result.likelySource}</strong>`;
+        modelBadge.innerHTML = txt;
+      }
+    } catch (err) {
+      console.error(err);
+      this.showToast('Error during detection: ' + err.message, 'error');
+    } finally {
+      if (analyzeBtn) {
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = 'Analyze Passage ⚡';
+      }
     }
   }
 
@@ -1123,7 +1152,7 @@ class TagaApp {
                     <td><span class="badge badge-pending">Pending Approval</span></td>
                     <td>
                       <button class="btn btn-primary" style="padding: 6px 14px; font-size: 12px;" onclick="window.tagaApp.approveProfessor('${prof.id}')">
-                        ✓ Approve Account
+                        âœ“ Approve Account
                       </button>
                     </td>
                   </tr>
@@ -1280,10 +1309,10 @@ class TagaApp {
           <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">Switch appearance using your custom palette variables:</p>
           <div style="display: flex; gap: 14px;">
             <button class="btn ${this.currentTheme === 'dark' ? 'btn-primary' : 'btn-secondary'}" onclick="window.tagaApp.applyTheme('dark'); window.tagaApp.renderPage('settings');">
-              🌙 Dark Mode (Default)
+              ðŸŒ™ Dark Mode (Default)
             </button>
             <button class="btn ${this.currentTheme === 'light' ? 'btn-primary' : 'btn-secondary'}" onclick="window.tagaApp.applyTheme('light'); window.tagaApp.renderPage('settings');">
-              ☀️ Light Mode
+              â˜€ï¸ Light Mode
             </button>
           </div>
         </div>
@@ -1348,7 +1377,7 @@ class TagaApp {
           </div>
           <div class="form-group">
             <label class="form-label">Password</label>
-            <input type="password" id="login-password" class="form-input" placeholder="••••••••" required />
+            <input type="password" id="login-password" class="form-input" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
           </div>
           <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; margin-top: 6px;">Sign In</button>
         </form>
@@ -1356,7 +1385,7 @@ class TagaApp {
         <div style="text-align: center; margin-top: 18px; font-size: 12px; color: var(--text-muted);">
           <a onclick="window.tagaApp.openTermsModal()" style="cursor: pointer; text-decoration: underline;">Terms</a> & 
           <a onclick="window.tagaApp.openPrivacyModal()" style="cursor: pointer; text-decoration: underline;">Privacy</a>
-          • Don't have an account? <a onclick="window.tagaApp.navigate('signup')" style="color: var(--accent-purple); cursor: pointer; font-weight: 600;">Sign up</a>
+          â€¢ Don't have an account? <a onclick="window.tagaApp.navigate('signup')" style="color: var(--accent-purple); cursor: pointer; font-weight: 600;">Sign up</a>
         </div>
       </div>
     `;
@@ -1390,7 +1419,7 @@ class TagaApp {
 
           <div class="form-group">
             <label class="form-label">Password</label>
-            <input type="password" id="signup-password" class="form-input" placeholder="••••••••" required />
+            <input type="password" id="signup-password" class="form-input" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
           </div>
 
           <div class="form-group">
@@ -1412,7 +1441,7 @@ class TagaApp {
               </label>
             </div>
             <div id="prof-signup-notice" style="display: none; font-size: 11px; color: var(--accent-rose); margin-top: 8px;">
-              ℹ️ Professor accounts require administrator approval before class creation and grading are unlocked.
+              â„¹ï¸ Professor accounts require administrator approval before class creation and grading are unlocked.
             </div>
           </div>
 
@@ -1702,7 +1731,7 @@ class TagaApp {
     modal.classList.add('show');
   }
 
-  executePassActivity() {
+  async executePassActivity() {
     if (this.currentUser && this.currentUser.role !== 'student') {
       this.showToast('Only students can pass activities.', 'error');
       return;
@@ -1721,7 +1750,7 @@ class TagaApp {
     const studentEmail = this.currentUser.email;
 
     // Automated Review generated upon submission!
-    const aiReview = AI_DETECTOR_ENGINE.generateSubmissionReview(content);
+    const aiReview = await AI_DETECTOR_ENGINE.generateSubmissionReview(content);
 
     const submissions = TagaStore.get(STORAGE_KEYS.SUBMISSIONS, []);
     const newSubmission = {
@@ -1843,7 +1872,7 @@ class TagaApp {
       } else {
         gradeBox.innerHTML = `
           <div style="background: var(--card-inner); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 14px; margin-bottom: 14px; font-size: 12px; color: var(--text-muted);">
-            ⏳ Activity awaiting instructor grading.
+            â³ Activity awaiting instructor grading.
           </div>
         `;
       }
@@ -1951,7 +1980,7 @@ class TagaApp {
     }
 
     toast.innerHTML = `
-      <span>${type === 'error' ? '⚠️' : (type === 'warning' ? '⏳' : '✨')}</span>
+      <span>${type === 'error' ? 'âš ï¸' : (type === 'warning' ? 'â³' : 'âœ¨')}</span>
       <div style="flex: 1;">${message}</div>
     `;
 
@@ -1969,3 +1998,4 @@ class TagaApp {
 window.addEventListener('DOMContentLoaded', () => {
   window.tagaApp = new TagaApp();
 });
+

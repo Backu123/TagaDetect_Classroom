@@ -1,0 +1,109 @@
+{
+  "created": "2026-11-19 15:11:13",
+  "normalization": "lowercase + digits removed + punctuation removed (v1)",
+  "min_words_reliable": 50,
+  "style": {
+    "max_words": 80,
+    "feature_names": [
+      "mean_word_len",
+      "std_word_len",
+      "share_long_words",
+      "share_short_words",
+      "mattr_15",
+      "repeat_bigram_ratio",
+      "repeat_trigram_ratio",
+      "top3_word_share",
+      "hapax_share_first20",
+      "char_entropy",
+      "vowel_ratio",
+      "english_function_share",
+      "tagalog_function_share"
+    ]
+  },
+  "label": {
+    "weights": {
+      "tfidf_lr": 0.4,
+      "lgbm_style": 0.0,
+      "xlmr": 0.6
+    },
+    "platt": {
+      "coef": 1.8912653361402492,
+      "intercept": -1.536861093905512
+    },
+    "thresholds": {
+      "likely_human_below": 0.7307953190397845,
+      "likely_ai_at_or_above": 0.7347174345659009
+    },
+    "max_fpr": 0.02
+  },
+  "source": {
+    "classes": [
+      "AI Singapore",
+      "Claude",
+      "Cohere",
+      "DeepSeek",
+      "Gemini",
+      "OpenAI"
+    ],
+    "weights": {
+      "tfidf_lr": 0.5,
+      "lgbm_style": 0.0,
+      "xlmr": 0.5
+    },
+    "min_conf": 0.5
+  },
+  "xlmr": {
+    "enabled": true,
+    "label_dir": "xlmr_label",
+    "source_dir": "xlmr_source",
+    "max_len": 384
+  },
+  "data": {
+    "rows_used": 2279,
+    "train": 1632,
+    "val": 326,
+    "test": 321,
+    "cleaning": [
+      {
+        "step": "template-built rows (Template_Closer_Flag = 1)",
+        "rows_removed": 245
+      },
+      {
+        "step": "empty text or spreadsheet error values",
+        "rows_removed": 1
+      },
+      {
+        "step": "code, markup, URLs or e-mail addresses",
+        "rows_removed": 11
+      },
+      {
+        "step": "exact duplicate texts",
+        "rows_removed": 2
+      },
+      {
+        "step": "fewer than 10 words",
+        "rows_removed": 0
+      },
+      {
+        "step": "AI rows without a Source",
+        "rows_removed": 0
+      }
+    ]
+  },
+  "test_metrics": {
+    "label_ensemble": {
+      "AUC": 0.9978,
+      "Accuracy": 0.9782,
+      "Precision": 0.9728,
+      "AI recall": 0.9795,
+      "F1": 0.9761,
+      "Human FPR": 0.0229,
+      "Brier": 0.0199
+    },
+    "source_ensemble": {
+      "Accuracy": 0.773972602739726,
+      "Macro-F1": 0.7758910037970104,
+      "Balanced acc.": 0.784107142857143
+    }
+  }
+}

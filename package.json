@@ -1,4 +1,12 @@
-{
+﻿{
+  "name": "tagadetect-classroom",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "server": "python server.py",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev": "npm run dev --prefix frontend"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0"
   }
