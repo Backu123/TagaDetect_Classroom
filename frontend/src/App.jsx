@@ -4895,8 +4895,13 @@ const mapClass = (c) => ({
   professorName: c.professor_name,
   professorAvatar: c.professor_avatar,
   studentIds: (c.enrollments || []).map((e) => e.student_id),
+  students: (c.enrollments || []).map((e) => ({
+    id: e.student_id,
+    name: e.profiles?.full_name || e.profiles?.username || "Student",
+    email: e.profiles?.email,
+    avatar: e.profiles?.avatar_url,
+  })),
 });
-
 /* =====================================================================
    SECTION 6: APP (holds all the data and decides which page to show)
    ===================================================================== */
@@ -4944,7 +4949,7 @@ function App() {
     }
     const { data, error } = await supabase
       .from("classes")
-      .select("*, enrollments(student_id)")
+      .select("*, enrollments(student_id, profiles(full_name, username, email, avatar_url))")
       .order("created_at", { ascending: false });
     if (error) {
       console.error("Classes load error:", error);
