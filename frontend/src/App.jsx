@@ -2203,7 +2203,7 @@ function ClassPage({ route }) {
     activities,
     reloadActivities,
     materials,
-    setMaterials,
+    reloadMaterials,
     submissions,
     reloadSubmissions,
     toast,
@@ -2357,25 +2357,30 @@ const submitActivity = async () => {
   toast(`Published activity "${title}"!`);
 };
 
-  const submitMaterial = () => {
+  const submitMaterial = async () => {
     const title = matForm.title.trim();
     if (!title) {
       toast("Please provide a document title.", "warning");
       return;
     }
 
-    const newMat = {
-      id: `mat_${Date.now()}`,
-      classId: cls.id,
+    const { error } = await supabase.from("materials").insert({
+      class_id: cls.id,
       title,
       category: matForm.category,
       type: matForm.type,
       description: matForm.desc.trim() || "Official course document.",
-      postedAt: new Date().toISOString().split("T")[0],
-      fileSize: "1.8 MB",
-    };
+      file_size: "1.8 MB",
+      posted_by: user.id,
+    });
 
-    setMaterials((prev) => [newMat, ...prev]);
+    if (error) {
+      console.error("Material insert error:", error);
+      toast(`Could not add material: ${error.message}`, "danger");
+      return;
+    }
+
+    await reloadMaterials();
     setMatForm(EMPTY_MATERIAL_FORM);
     closeModal();
     toast(`Material "${title}" added to class hub!`);
@@ -3311,7 +3316,7 @@ function DetectorPage() {
     setResult(null);
   };
 
-  const submitFeedback = () => {
+  const submitFeedback = async () => {
     const comment = fbForm.comment.trim();
     if (!comment) {
       toast(
@@ -3321,20 +3326,45 @@ function DetectorPage() {
       return;
     }
 
-    const entry = {
-      id: `fb_${Date.now()}`,
-      userId: user ? user.id : "usr_guest",
-      userName: user ? user.name : "Guest User",
-      userRole: user ? user.role : "student",
-      timestamp: new Date().toISOString(),
-      detectedScore: result ? result.overallAiScore : 0,
-      accuracyRating: fbForm.rating,
-      feedbackType: fbForm.type,
+    const payload = {
+      user_id: user ? user.id : null,
+      user_name: user ? user.name : "Guest User",
+      user_role: user ? user.role : "student",
+      detected_score: result ? result.overallAiScore : 0,
+      accuracy_rating: fbForm.rating,
+      feedback_type: fbForm.type,
       comment,
       status: "Audited",
     };
 
-    setFeedback((prev) => [entry, ...prev]);
+    const { data: inserted, error } = await supabase
+      .from("detector_feedback")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Feedback insert error:", error);
+      toast(`Could not save feedback: ${error.message}`, "danger");
+      return;
+    }
+
+    // Optimistically prepend to the local list so the user sees it immediately
+    setFeedback((prev) => [
+      {
+        id: inserted.id,
+        userId: inserted.user_id,
+        userName: inserted.user_name,
+        userRole: inserted.user_role,
+        timestamp: inserted.created_at,
+        detectedScore: inserted.detected_score,
+        accuracyRating: inserted.accuracy_rating,
+        feedbackType: inserted.feedback_type,
+        comment: inserted.comment,
+        status: inserted.status,
+      },
+      ...prev,
+    ]);
     setFbForm({
       rating: "highly_accurate",
       type: "Accuracy Feedback",
@@ -4928,19 +4958,10 @@ function App() {
   const [theme, setTheme] = usePersistedState(STORAGE_KEYS.THEME, "dark");
   const [users, setUsers] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [activities, setActivities] = usePersistedState(
-    STORAGE_KEYS.ACTIVITIES,
-    INITIAL_ACTIVITIES,
-  );
-  const [materials, setMaterials] = usePersistedState(
-    STORAGE_KEYS.MATERIALS,
-    INITIAL_MATERIALS,
-  );
+  const [activities, setActivities] = useState([]);
+  const [materials, setMaterials] = useState([]);
   const [submissions, setSubmissions] = useState([]);
-  const [feedback, setFeedback] = usePersistedState(
-    STORAGE_KEYS.FEEDBACK,
-    INITIAL_FEEDBACK,
-  );
+  const [feedback, setFeedback] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -5017,6 +5038,72 @@ function App() {
   useEffect(() => {
     reloadSubmissions();
   }, [reloadSubmissions]);
+
+  const reloadMaterials = useCallback(async () => {
+    if (!session) {
+      setMaterials([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("materials")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Materials load error:", error);
+      toast(`Could not load materials: ${error.message}`, "danger");
+      return;
+    }
+    setMaterials(
+      (data || []).map((m) => ({
+        id: m.id,
+        classId: m.class_id,
+        title: m.title,
+        category: m.category,
+        type: m.type,
+        description: m.description || "",
+        fileSize: m.file_size || "0 KB",
+        fileUrl: m.file_url || null,
+        postedAt: m.created_at ? new Date(m.created_at).toISOString().split("T")[0] : "",
+      })),
+    );
+  }, [session, toast]);
+
+  useEffect(() => {
+    reloadMaterials();
+  }, [reloadMaterials]);
+
+  const reloadFeedback = useCallback(async () => {
+    if (!session) {
+      setFeedback([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("detector_feedback")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Feedback load error:", error);
+      return;
+    }
+    setFeedback(
+      (data || []).map((f) => ({
+        id: f.id,
+        userId: f.user_id,
+        userName: f.user_name || "User",
+        userRole: f.user_role || "student",
+        timestamp: f.created_at,
+        detectedScore: f.detected_score || 0,
+        accuracyRating: f.accuracy_rating || "partially_accurate",
+        feedbackType: f.feedback_type || "Accuracy Feedback",
+        comment: f.comment || "",
+        status: f.status || "Audited",
+      })),
+    );
+  }, [session, toast]);
+
+  useEffect(() => {
+    reloadFeedback();
+  }, [reloadFeedback]);
 
 
     // Restore the session on page load and listen for sign in / sign out
@@ -5169,6 +5256,8 @@ function App() {
     reloadClasses,
     reloadActivities,
     reloadSubmissions,
+    reloadMaterials,
+    reloadFeedback,
     activities,
     setActivities,
     materials,
