@@ -2196,16 +2196,16 @@ function ReviewReport({ sub }) {
 /* ---------- Class page: Activities, Materials, and People ---------- */
 
 function ClassPage({ route }) {
-  const {
+    const {
     user,
     users,
     classes,
     activities,
-    setActivities,
+    reloadActivities,
     materials,
     setMaterials,
     submissions,
-    setSubmissions,
+    reloadSubmissions,
     toast,
   } = useApp();
 
@@ -2263,9 +2263,7 @@ function ClassPage({ route }) {
 
   const classActivities = activities.filter((a) => a.classId === cls.id);
   const classMaterials = materials.filter((m) => m.classId === cls.id);
-  const enrolled = (cls.studentIds || [])
-    .map((id) => users.find((u) => u.id === id))
-    .filter(Boolean);
+  const enrolled = cls.students || [];
   const instructor = users.find((u) => u.id === cls.professorId);
 
   const reviewSub = submissions.find((s) => s.id === reviewId) || null;
@@ -2291,74 +2289,73 @@ function ClassPage({ route }) {
     setModal("pass");
   };
 
-  const submitPass = () => {
-    if (!passActivity) return;
-    const text = passText.trim();
-    if (text.length < 30) {
-      toast(
-        "Please write at least 30 characters for your submission.",
-        "warning",
-      );
-      return;
-    }
+const submitPass = async () => {
+  if (!passActivity) return;
+  const text = passText.trim();
+  if (text.length < 30) {
+    toast("Please write at least 30 characters for your submission.", "warning");
+    return;
+  }
 
-    const aiReview = generateSubmissionReview(text);
-    const newSub = {
-      id: `sub_${Date.now()}`,
-      activityId: passActivity.id,
-      studentId: user.id,
-      studentName: user.name,
-      studentEmail: user.email,
-      submittedAt: new Date().toISOString(),
+  const aiReview = generateSubmissionReview(text);
+
+  const { error } = await supabase.from("submissions").upsert(
+    {
+      activity_id: passActivity.id,
+      student_id: user.id,
       content: text,
-      wordCount: countWords(text),
-      aiReview,
-      grade: null,
-      professorFeedback: null,
-    };
+      ai_review: aiReview,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    },
+    { onConflict: "activity_id,student_id" },
+  );
 
-    setSubmissions((prev) => [
-      newSub,
-      ...prev.filter(
-        (s) => !(s.activityId === passActivity.id && s.studentId === user.id),
-      ),
-    ]);
-    closeModal();
-    toast(
-      `Activity successfully passed! AI Review: ${aiReview.overallAiScore}% AI.`,
-    );
-  };
+  if (error) {
+    console.error("Submit error:", error);
+    toast(`Could not submit: ${error.message}`, "danger");
+    return;
+  }
 
-  const submitActivity = () => {
-    const title = actForm.title.trim();
-    if (!title) {
-      toast("Please provide an activity title.", "warning");
-      return;
-    }
+  await reloadSubmissions();
+  closeModal();
+  toast(`Activity successfully passed! AI Review: ${aiReview.overallAiScore}% AI.`);
+};
 
-    const points = Math.min(
-      100,
-      Math.max(10, parseInt(actForm.points, 10) || 100),
-    );
-    const newAct = {
-      id: `act_${Date.now()}`,
-      classId: cls.id,
-      title,
-      description:
-        actForm.instructions.trim() ||
-        "Complete the assignment prompt in clear, structured prose.",
-      dueDate: actForm.due || "2026-11-20",
-      maxPoints: points,
-      rubric: "Conceptual rigor & clarity",
-      status: "open",
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+const submitActivity = async () => {
+  const title = actForm.title.trim();
+  if (!title) {
+    toast("Please provide an activity title.", "warning");
+    return;
+  }
 
-    setActivities((prev) => [newAct, ...prev]);
-    setActForm(EMPTY_ACTIVITY_FORM);
-    closeModal();
-    toast(`Published activity "${title}"!`);
-  };
+  const points = Math.min(
+    100,
+    Math.max(10, parseInt(actForm.points, 10) || 100),
+  );
+
+  const { error } = await supabase.from("activities").insert({
+    class_id: cls.id,
+    title,
+    instructions:
+      actForm.instructions.trim() ||
+      "Complete the assignment prompt in clear, structured prose.",
+    due_date: actForm.due || null,
+    max_points: points,
+    rubric: "Conceptual rigor & clarity",
+  });
+
+  if (error) {
+    console.error("Create activity error:", error);
+    toast(`Could not publish: ${error.message}`, "danger");
+    return;
+  }
+
+  await reloadActivities();
+  setActForm(EMPTY_ACTIVITY_FORM);
+  closeModal();
+  toast(`Published activity "${title}"!`);
+};
 
   const submitMaterial = () => {
     const title = matForm.title.trim();
@@ -2396,32 +2393,36 @@ function ClassPage({ route }) {
     setModal("grade");
   };
 
-  const submitGrade = () => {
-    if (!gradeSub) return;
-    const max = gradeActivity ? gradeActivity.maxPoints : 100;
-    const score = parseFloat(gradeScore);
+const submitGrade = async () => {
+  if (!gradeSub) return;
+  const max = gradeActivity ? gradeActivity.maxPoints : 100;
+  const score = parseFloat(gradeScore);
 
-    if (Number.isNaN(score) || score < 0 || score > max) {
-      toast(`Enter a score between 0 and ${max}.`, "warning");
-      return;
-    }
+  if (Number.isNaN(score) || score < 0 || score > max) {
+    toast(`Enter a score between 0 and ${max}.`, "warning");
+    return;
+  }
 
-    setSubmissions((prev) =>
-      prev.map((s) =>
-        s.id === gradeSub.id
-          ? {
-              ...s,
-              grade: score,
-              professorFeedback: gradeFeedback.trim(),
-              gradedAt: new Date().toISOString(),
-              gradedBy: user.name,
-            }
-          : s,
-      ),
-    );
-    closeModal();
-    toast(`Grade recorded for ${gradeSub.studentName}!`);
-  };
+  const { error } = await supabase
+    .from("submissions")
+    .update({
+      grade: score,
+      feedback: gradeFeedback.trim(),
+      graded_at: new Date().toISOString(),
+      status: "graded",
+    })
+    .eq("id", gradeSub.id);
+
+  if (error) {
+    console.error("Grade error:", error);
+    toast(`Could not save grade: ${error.message}`, "danger");
+    return;
+  }
+
+  await reloadSubmissions();
+  closeModal();
+  toast(`Grade recorded for ${gradeSub.studentName}!`);
+};
 
   const setActField = (field) => (e) =>
     setActForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -4872,6 +4873,31 @@ const PAGES = {
   admin: AdminPage,
 };
 
+const mapActivity = (a) => ({
+  id: a.id,
+  classId: a.class_id,
+  title: a.title,
+  description: a.instructions,
+  dueDate: a.due_date ? new Date(a.due_date).toLocaleDateString() : null,
+  maxPoints: a.max_points,
+  rubric: a.rubric,
+  status: "open",
+  createdAt: a.created_at,
+});
+const mapSubmission = (s) => ({
+  id: s.id,
+  activityId: s.activity_id,
+  studentId: s.student_id,
+  studentName: s.profiles?.full_name || s.profiles?.username || "Student",
+  studentEmail: s.profiles?.email,
+  submittedAt: s.submitted_at,
+  content: s.content || "",
+  wordCount: countWords(s.content || ""),
+  aiReview: s.ai_review,
+  grade: s.grade,
+  professorFeedback: s.feedback,
+  gradedAt: s.graded_at,
+});
 // Converts a row from the classes table into the shape the app uses
 const mapClass = (c) => ({
   id: c.id,
@@ -4910,10 +4936,7 @@ function App() {
     STORAGE_KEYS.MATERIALS,
     INITIAL_MATERIALS,
   );
-  const [submissions, setSubmissions] = usePersistedState(
-    STORAGE_KEYS.SUBMISSIONS,
-    INITIAL_SUBMISSIONS,
-  );
+  const [submissions, setSubmissions] = useState([]);
   const [feedback, setFeedback] = usePersistedState(
     STORAGE_KEYS.FEEDBACK,
     INITIAL_FEEDBACK,
@@ -4953,7 +4976,49 @@ function App() {
     reloadClasses();
   }, [reloadClasses]);
 
-  
+  const reloadActivities = useCallback(async () => {
+    if (!session) {
+      setActivities([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("activities")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Activities load error:", error);
+      toast(`Could not load activities: ${error.message}`, "danger");
+      return;
+    }
+    setActivities((data || []).map(mapActivity));
+  }, [session, toast]);
+
+  useEffect(() => {
+    reloadActivities();
+  }, [reloadActivities]);
+
+  const reloadSubmissions = useCallback(async () => {
+    if (!session) {
+      setSubmissions([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("submissions")
+      .select("*, profiles(full_name, username, email)")
+      .order("submitted_at", { ascending: false });
+    if (error) {
+      console.error("Submissions load error:", error);
+      toast(`Could not load submissions: ${error.message}`, "danger");
+      return;
+    }
+    setSubmissions((data || []).map(mapSubmission));
+  }, [session, toast]);
+
+  useEffect(() => {
+    reloadSubmissions();
+  }, [reloadSubmissions]);
+
+
     // Restore the session on page load and listen for sign in / sign out
   useEffect(() => {
     let active = true;
@@ -5102,6 +5167,8 @@ function App() {
     setUsers,
     classes,
     reloadClasses,
+    reloadActivities,
+    reloadSubmissions,
     activities,
     setActivities,
     materials,
