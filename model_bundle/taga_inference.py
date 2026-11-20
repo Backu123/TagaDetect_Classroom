@@ -111,13 +111,18 @@ class TagaDetector:
             "source_probabilities": None,
         }
 
-        if band != "likely_human":
+        # Stage 2: Source classifier — only runs when Stage 1 detects AI content.
+        # If the text is classified as human (ai_probability < 35%), skip source
+        # attribution entirely — there is no meaningful generator to attribute.
+        if ai_probability >= 0.35:
             source_mix, _ = self._ensemble("source", clean)
             classes = self.cfg["source"]["classes"]
-            result["source_probabilities"] = {c: round(float(p), 4) for c, p in zip(classes, source_mix)}
+            probs_dict = {c: round(float(p), 4) for c, p in zip(classes, source_mix)}
+            result["source_probabilities"] = probs_dict
             top = int(np.argmax(source_mix))
-            if source_mix[top] >= self.cfg["source"]["min_conf"]:
-                result["likely_source"] = classes[top]
+            result["likely_source"] = classes[top]
+            result["source_confidence"] = round(float(source_mix[top]), 4)
+
         return result
 
     def predict_detailed(self, text):
@@ -136,7 +141,8 @@ class TagaDetector:
                 "isRealModel": True,
                 "modelScores": {},
                 "likelySource": None,
-                "sourceProbabilities": None
+                "sourceProbabilities": None,
+                "sortedSources": []
             }
 
         base_res = self.predict(text)
@@ -210,13 +216,24 @@ class TagaDetector:
         else:
             verdict = "Authentic Human Authorship"
 
+        # Stage 2 results — only populated when Stage 1 detected AI (score >= 35%).
+        # For human text, base_res["likely_source"] is None, so these stay empty.
+        likely_source = base_res.get("likely_source")        # None for human text
+        source_probs = base_res.get("source_probabilities")  # None for human text
+        sorted_sources = []
+        if source_probs:
+            sorted_sources = sorted(
+                [{"name": k, "score": int(round(v * 100)), "percentage": int(round(v * 100)), "probability": v} for k, v in source_probs.items()],
+                key=lambda x: x["score"],
+                reverse=True
+            )
+
         # Build diagnostic flags
         ai_cnt = sum(1 for s in sentence_breakdown if s["label"] == "ai")
         flags = [f"{ai_cnt} of {len(sentences)} sentences classified as synthetic cadence"]
 
-        if base_res.get("likely_source"):
-            conf = int(round(base_res["source_probabilities"].get(base_res["likely_source"], 0) * 100))
-            flags.append(f"Synthesized generator signature: {base_res['likely_source']} ({conf}% confidence)")
+        if likely_source and sorted_sources:
+            flags.append(f"Top AI Source Baseline: {likely_source} ({sorted_sources[0]['score']}% match)")
         elif overall_score >= 40:
             flags.append("Synthetic structure detected across multiple generative model baselines")
 
@@ -239,7 +256,8 @@ class TagaDetector:
             "flags": flags,
             "sentenceBreakdown": sentence_breakdown,
             "isRealModel": True,
-            "likelySource": base_res.get("likely_source"),
-            "sourceProbabilities": base_res.get("source_probabilities"),
+            "likelySource": likely_source,
+            "sourceProbabilities": source_probs,
+            "sortedSources": sorted_sources,
             "modelScores": base_res.get("model_scores")
         }

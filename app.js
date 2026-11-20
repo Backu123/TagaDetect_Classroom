@@ -839,6 +839,9 @@ class TagaApp {
               </div>
             </div>
 
+            <!-- Predicted AI Model Generator Card -->
+            <div id="app-ai-source-card" style="margin-top: 14px; margin-bottom: 14px; display: none;"></div>
+
             <div class="card-inner-box" style="margin-top: auto; padding: 14px;">
               <div style="font-size: 12px; font-weight: 700; color: var(--accent-purple); margin-bottom: 4px;">USER FEEDBACK MECHANISM</div>
               <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">
@@ -988,6 +991,58 @@ class TagaApp {
       if (burstinessVal) burstinessVal.textContent = `${result.burstinessScore} / 100`;
       if (burstinessBar) burstinessBar.style.width = `${result.burstinessScore}%`;
 
+      const sourceCard = document.getElementById('app-ai-source-card');
+      if (sourceCard) {
+        if (score >= 35) {
+          const topModel = result.likelySource || (result.sortedSources && result.sortedSources[0] ? result.sortedSources[0].name : 'Unknown');
+          const isHighAi = score >= 65;
+          let sHtml = `
+            <div style="background: var(--card-inner); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 12px; padding: 12px 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+                <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-rose);">
+                  🤖 Predicted AI Model Generator
+                </span>
+                <span class="badge badge-ai" style="font-size: 10px; padding: 2px 8px;">${topModel}</span>
+              </div>
+              <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
+                ${isHighAi
+                  ? `Cadence most strongly aligns with <strong style="color: var(--text-main);">${topModel}</strong> as primary generator.`
+                  : `Stylistic patterns show partial alignment with <strong style="color: var(--text-main);">${topModel}</strong> generative characteristics.`}
+              </p>`;
+          if (result.sortedSources && result.sortedSources.length > 0) {
+            sHtml += `<div style="display: flex; flex-direction: column; gap: 4px;">`;
+            result.sortedSources.slice(0, 5).forEach(s => {
+              const isTop = s.name === topModel;
+              const val = s.score !== undefined ? s.score : (s.percentage || 0);
+              sHtml += `
+                <div>
+                  <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px; color: ${isTop ? 'var(--text-main)' : 'var(--text-muted)'}; font-weight: ${isTop ? '700' : '400'};">
+                    <span>${s.name} ${isTop ? '★' : ''}</span>
+                    <span>${val}%</span>
+                  </div>
+                  <div style="height: 5px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden;">
+                    <div style="height: 100%; width: ${Math.max(val, 4)}%; background: ${isTop ? 'var(--accent-rose)' : 'rgba(244,63,94,0.4)'}; border-radius: 999px;"></div>
+                  </div>
+                </div>`;
+            });
+            sHtml += `</div>`;
+          }
+          sHtml += `</div>`;
+          sourceCard.innerHTML = sHtml;
+          sourceCard.style.display = 'block';
+        } else {
+          sourceCard.innerHTML = `
+            <div style="background: var(--card-inner); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;">
+              <div style="width: 26px; height: 26px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: var(--accent-emerald); font-weight: 700; font-size: 13px; flex-shrink: 0;">✓</div>
+              <div>
+                <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-emerald);">No AI Generator Signature Detected</div>
+                <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">Token entropy and cadence align with authentic human authorship.</div>
+              </div>
+            </div>`;
+          sourceCard.style.display = 'block';
+        }
+      }
+
       if (sentenceContainer) {
         sentenceContainer.innerHTML = result.sentenceBreakdown.map(s => {
           return `<span class="hl-sentence ${s.label}" title="${s.score}% AI">${s.text} </span>`;
@@ -1022,6 +1077,11 @@ class TagaApp {
     const gaugeFill = document.getElementById('gauge-progress');
     const verdictBadge = document.getElementById('verdict-badge');
     const sentenceContainer = document.getElementById('sentence-breakdown-container');
+    const sourceCard = document.getElementById('app-ai-source-card');
+    if (sourceCard) {
+      sourceCard.style.display = 'none';
+      sourceCard.innerHTML = '';
+    }
 
     if (scoreText) scoreText.textContent = '0%';
     if (gaugeFill) gaugeFill.style.strokeDashoffset = '471';

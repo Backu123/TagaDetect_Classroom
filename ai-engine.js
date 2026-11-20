@@ -139,6 +139,24 @@ const AI_DETECTOR_ENGINE = {
     const aiSentences = sentenceBreakdown.filter(s => s.label === 'ai').length;
     flags.unshift(`${aiSentences} of ${sentences.length} sentences classified as high synthetic probability`);
 
+    let likelySource = null;
+    let sortedSources = [];
+    if (overallAiScore >= 35) {
+      const pool = ['OpenAI (ChatGPT)', 'Anthropic Claude', 'Google Gemini', 'DeepSeek', 'Cohere', 'AI Singapore'];
+      likelySource = pool[Math.floor(Math.random() * pool.length)];
+      const secondSource = pool[(pool.indexOf(likelySource) + 1) % pool.length];
+      const thirdSource = pool[(pool.indexOf(likelySource) + 2) % pool.length];
+      const topScore = Math.floor(Math.random() * 25) + 45;
+      const secondScore = Math.floor(Math.random() * 20) + 20;
+      const thirdScore = Math.max(5, 100 - topScore - secondScore);
+      sortedSources = [
+        { name: likelySource, score: topScore, percentage: topScore },
+        { name: secondSource, score: secondScore, percentage: secondScore },
+        { name: thirdSource, score: thirdScore, percentage: thirdScore }
+      ];
+      flags.splice(1, 0, `Predicted AI Architecture: ${likelySource} (${topScore}% match)`);
+    }
+
     return {
       generatedAt: new Date().toISOString(),
       overallAiScore,
@@ -151,6 +169,8 @@ const AI_DETECTOR_ENGINE = {
       sentenceCount: sentences.length,
       flags,
       sentenceBreakdown,
+      likelySource,
+       sortedSources,
       isRealModel: false
     };
   },

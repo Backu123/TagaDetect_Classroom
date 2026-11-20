@@ -99,6 +99,9 @@
             </div>
           </div>
 
+          <!-- AI Model Generator Detection Card -->
+          <div id="ai-source-card" style="display: none; margin-bottom: 20px;"></div>
+
           <!-- Sentence-by-Sentence Breakdown -->
           <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 8px;">Sentence Cadence Breakdown</h4>
           <div id="sentence-breakdown-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto;"></div>
@@ -197,6 +200,69 @@
         // Metrics
         document.getElementById('metric-perplexity').textContent = `${result.perplexityScore || 78} / 100`;
         document.getElementById('metric-burstiness').textContent = `${result.burstinessScore || 64} / 100`;
+
+        // AI Source card — only shown when AI is detected (score >= 35)
+        const sourceCard = document.getElementById('ai-source-card');
+        if (sourceCard) {
+          if (currentScore >= 35) {
+            const topModel = result.likelySource || (result.sortedSources && result.sortedSources[0] ? result.sortedSources[0].name : 'Unknown');
+            const isHighAi = currentScore >= 65;
+            let sourceHtml = `
+              <div style="background: var(--card-inner); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 12px; padding: 14px 16px; box-shadow: 0 0 20px rgba(244, 63, 94, 0.06);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">🤖</span>
+                    <span style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-rose);">
+                      Predicted AI Model Generator
+                    </span>
+                  </div>
+                  <span class="badge badge-ai" style="font-size: 11px; padding: 3px 10px; font-weight: 700;">
+                    ${topModel}
+                  </span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.5;">
+                  ${isHighAi
+                    ? `Stylistic cadence most strongly aligns with <strong style="color: var(--text-main);">${topModel}</strong> as the primary generator.`
+                    : `Stylistic patterns show partial alignment with <strong style="color: var(--text-main);">${topModel}</strong> generative characteristics.`}
+                </p>`;
+
+            if (result.sortedSources && result.sortedSources.length > 0) {
+              sourceHtml += `
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <div style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; margin-bottom: 2px;">
+                    Model Probability Attribution
+                  </div>`;
+              result.sortedSources.slice(0, 5).forEach(s => {
+                const isTop = s.name === topModel;
+                const val = s.score !== undefined ? s.score : (s.percentage || 0);
+                sourceHtml += `
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px; color: ${isTop ? 'var(--text-main)' : 'var(--text-muted)'}; font-weight: ${isTop ? '700' : '400'};">
+                      <span>${s.name} ${isTop ? '★' : ''}</span>
+                      <span>${val}%</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 999px; overflow: hidden;">
+                      <div style="height: 100%; width: ${Math.max(val, 4)}%; background: ${isTop ? 'var(--accent-rose)' : 'rgba(244,63,94,0.4)'}; border-radius: 999px; transition: width 0.4s ease;"></div>
+                    </div>
+                  </div>`;
+              });
+              sourceHtml += `</div>`;
+            }
+            sourceHtml += `</div>`;
+            sourceCard.innerHTML = sourceHtml;
+            sourceCard.style.display = 'block';
+          } else {
+            sourceCard.innerHTML = `
+              <div style="background: var(--card-inner); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 12px;">
+                <div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: var(--accent-emerald); font-weight: 700; font-size: 14px; flex-shrink: 0;">✓</div>
+                <div>
+                  <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-emerald);">No AI Generator Signature Detected</div>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Stylistic burstiness and token entropy align with authentic human authorship.</div>
+                </div>
+              </div>`;
+            sourceCard.style.display = 'block';
+          }
+        }
 
         // Sentence cadence breakdown
         const list = document.getElementById('sentence-breakdown-list');
