@@ -2107,6 +2107,15 @@ function countWords(text) {
   return t ? t.split(/\s+/).length : 0;
 }
 
+function formatBytes(bytes, decimals = 1) {
+  if (!bytes || bytes <= 0) return "0 B";
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+
 const hasGrade = (sub) => sub.grade !== undefined && sub.grade !== null;
 
 const EMPTY_ACTIVITY_FORM = {
@@ -2170,6 +2179,31 @@ function ReviewReport({ sub }) {
           </div>
         </div>
       </div>
+
+      {sub.fileUrl && (
+        <div className="flex items-center justify-between p-4 mb-5 bg-card-inner border border-line rounded-[14px]">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-2xl">📄</span>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-main truncate">
+                {sub.fileName || "Submitted Attachment"}
+              </div>
+              <div className="text-xs text-muted">
+                {sub.fileSize || "Attached Document"}
+              </div>
+            </div>
+          </div>
+          <a
+            href={sub.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            download={sub.fileName || true}
+            className={btn("primary", "!text-xs !px-4 !py-1.5 shrink-0")}
+          >
+            Open File ↗
+          </a>
+        </div>
+      )}
 
       {hasGrade(sub) && (
         <div className="bg-emerald/10 border border-emerald rounded-[14px] px-4 py-3 mb-5">
@@ -2275,7 +2309,12 @@ function ClassPage({ route }) {
     ? activities.find((a) => a.id === gradeSub.activityId)
     : null;
 
-  const closeModal = () => setModal(null);
+  const closeModal = () => {
+    setModal(null);
+    setPassFile(null);
+    setMatFile(null);
+    setUploading(false);
+  };
 
   const copyCode = () => {
     try {
@@ -2289,93 +2328,259 @@ function ClassPage({ route }) {
   const openPass = (act) => {
     setPassActivity(act);
     setPassText("");
+    setPassFile(null);
     setModal("pass");
   };
 
-const submitPass = async () => {
-  if (!passActivity) return;
-  const text = passText.trim();
-  if (text.length < 30) {
-    toast("Please write at least 30 characters for your submission.", "warning");
-    return;
-  }
+  const handlePassFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPassFile(file);
+    if (file.type.startsWith("text/") || file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const textContent = ev.target?.result;
+        if (typeof textContent === "string" && !passText) {
+          setPassText(textContent);
+          toast(`Loaded text from ${file.name} for AI analysis!`, "info");
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
 
-  const aiReview = generateSubmissionReview(text);
-
-  const { error } = await supabase.from("submissions").upsert(
-    {
-      activity_id: passActivity.id,
-      student_id: user.id,
-      content: text,
-      ai_review: aiReview,
-      status: "submitted",
-      submitted_at: new Date().toISOString(),
-    },
-    { onConflict: "activity_id,student_id" },
-  );
-
-  if (error) {
-    console.error("Submit error:", error);
-    toast(`Could not submit: ${error.message}`, "danger");
-    return;
-  }
-
-  await reloadSubmissions();
-  closeModal();
-  toast(`Activity successfully passed! AI Review: ${aiReview.overallAiScore}% AI.`);
-};
-
-const submitActivity = async () => {
-  const title = actForm.title.trim();
-  if (!title) {
-    toast("Please provide an activity title.", "warning");
-    return;
-  }
-
-  const points = Math.min(
-    100,
-    Math.max(10, parseInt(actForm.points, 10) || 100),
-  );
-
-  const { error } = await supabase.from("activities").insert({
-    class_id: cls.id,
-    title,
-    instructions:
-      actForm.instructions.trim() ||
-      "Complete the assignment prompt in clear, structured prose.",
-    due_date: actForm.due || null,
-    max_points: points,
-    rubric: "Conceptual rigor & clarity",
-  });
-
-  if (error) {
-    console.error("Create activity error:", error);
-    toast(`Could not publish: ${error.message}`, "danger");
-    return;
-  }
-
-  await reloadActivities();
-  setActForm(EMPTY_ACTIVITY_FORM);
-  closeModal();
-  toast(`Published activity "${title}"!`);
-};
-
-  const submitMaterial = async () => {
-    const title = matForm.title.trim();
-    if (!title) {
-      toast("Please provide a document title.", "warning");
+  const submitPass = async () => {
+    if (!passActivity) return;
+    const text = passText.trim();
+    if (!text && !passFile) {
+      toast("Please provide either written text or attach a file.", "warning");
+      return;
+    }
+    if (text.length > 0 && text.length < 15 && !passFile) {
+      toast("Please write at least 15 characters for AI analysis.", "warning");
       return;
     }
 
-    const { error } = await supabase.from("materials").insert({
+    setUploading(true);
+    let uploadedFileUrl = null;
+    let uploadedFileName = passFile ? passFile.name : null;
+    let uploadedFileSize = passFile ? formatBytes(passFile.size) : null;
+
+    if (passFile) {
+      try {
+        const safeName = passFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const storagePath = `submissions/${cls.id}/${passActivity.id}/${user.id}_${Date.now()}_${safeName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("classroom-files")
+          .upload(storagePath, passFile, { upsert: true });
+
+        if (uploadErr) {
+          console.warn("Storage upload failed, attempting fallback:", uploadErr);
+          if (passFile.size < 4 * 1024 * 1024) {
+            uploadedFileUrl = await new Promise((resolve) => {
+              const r = new FileReader();
+              r.onload = () => resolve(r.result);
+              r.readAsDataURL(passFile);
+            });
+          } else {
+            toast(`Storage bucket 'classroom-files' not ready: ${uploadErr.message}`, "danger");
+            setUploading(false);
+            return;
+          }
+        } else {
+          const { data: urlData } = supabase.storage
+            .from("classroom-files")
+            .getPublicUrl(storagePath);
+          uploadedFileUrl = urlData?.publicUrl || null;
+        }
+      } catch (err) {
+        console.error("File upload error:", err);
+        toast(`File upload error: ${err.message}`, "danger");
+        setUploading(false);
+        return;
+      }
+    }
+
+    const aiReview = generateSubmissionReview(
+      text || (uploadedFileName ? `Attached document: ${uploadedFileName}. Content submitted for evaluation.` : "")
+    );
+    if (uploadedFileUrl) {
+      aiReview.fileUrl = uploadedFileUrl;
+      aiReview.fileName = uploadedFileName;
+      aiReview.fileSize = uploadedFileSize;
+    }
+
+    const payload = {
+      activity_id: passActivity.id,
+      student_id: user.id,
+      content: text || (uploadedFileName ? `[Attached File: ${uploadedFileName}]` : ""),
+      ai_review: aiReview,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+    };
+
+    let { error } = await supabase.from("submissions").upsert(
+      {
+        ...payload,
+        file_url: uploadedFileUrl,
+        file_name: uploadedFileName,
+        file_size: uploadedFileSize,
+      },
+      { onConflict: "activity_id,student_id" }
+    );
+
+    if (error && error.message?.includes("file_url")) {
+      console.warn("Retrying submission upsert without file_url column:", error.message);
+      const res = await supabase.from("submissions").upsert(
+        payload,
+        { onConflict: "activity_id,student_id" }
+      );
+      error = res.error;
+    }
+
+    setUploading(false);
+
+    if (error) {
+      console.error("Submit error:", error);
+      toast(`Could not submit: ${error.message}`, "danger");
+      return;
+    }
+
+    await reloadSubmissions();
+    closeModal();
+    setPassFile(null);
+    toast(`Activity passed successfully! ${uploadedFileName ? "File attached." : ""}`);
+  };
+
+  const submitActivity = async () => {
+    const title = actForm.title.trim();
+    if (!title) {
+      toast("Please provide an activity title.", "warning");
+      return;
+    }
+
+    const points = Math.min(
+      100,
+      Math.max(10, parseInt(actForm.points, 10) || 100),
+    );
+
+    const { error } = await supabase.from("activities").insert({
       class_id: cls.id,
       title,
-      category: matForm.category,
-      type: matForm.type,
-      description: matForm.desc.trim() || "Official course document.",
-      file_size: "1.8 MB",
-      posted_by: user.id,
+      instructions:
+        actForm.instructions.trim() ||
+        "Complete the assignment prompt in clear, structured prose.",
+      due_date: actForm.due || null,
+      max_points: points,
+      rubric: "Conceptual rigor & clarity",
     });
+
+    if (error) {
+      console.error("Create activity error:", error);
+      toast(`Could not publish: ${error.message}`, "danger");
+      return;
+    }
+
+    await reloadActivities();
+    setActForm(EMPTY_ACTIVITY_FORM);
+    closeModal();
+    toast(`Published activity "${title}"!`);
+  };
+
+  const handleMatFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMatFile(file);
+    if (!matForm.title) {
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+      setMatForm((prev) => ({ ...prev, title: baseName }));
+    }
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    let detectedType = "PDF Document";
+    if (["ppt", "pptx", "key"].includes(ext)) detectedType = "Slide Presentation";
+    else if (["doc", "docx", "odt", "rtf"].includes(ext)) detectedType = "Word Document";
+    else if (["zip", "tar", "gz", "rar", "7z", "py", "java", "cpp", "js"].includes(ext)) detectedType = "Interactive Lab Tool";
+    setMatForm((prev) => ({ ...prev, type: detectedType }));
+  };
+
+  const submitMaterial = async () => {
+    const title = matForm.title.trim();
+    if (!title && !matFile) {
+      toast("Please provide a document title or choose a file from your device.", "warning");
+      return;
+    }
+
+    const materialTitle = title || matFile?.name || "Untitled Material";
+    setUploading(true);
+
+    let uploadedFileUrl = null;
+    let uploadedFileName = matFile ? matFile.name : null;
+    let uploadedFileSize = matFile ? formatBytes(matFile.size) : "1.8 MB";
+
+    if (matFile) {
+      try {
+        const safeName = matFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const storagePath = `materials/${cls.id}/${Date.now()}_${safeName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("classroom-files")
+          .upload(storagePath, matFile, { upsert: true });
+
+        if (uploadErr) {
+          console.warn("Material storage upload error:", uploadErr);
+          if (matFile.size < 4 * 1024 * 1024) {
+            uploadedFileUrl = await new Promise((resolve) => {
+              const r = new FileReader();
+              r.onload = () => resolve(r.result);
+              r.readAsDataURL(matFile);
+            });
+          } else {
+            toast(`Storage bucket 'classroom-files' not ready: ${uploadErr.message}`, "danger");
+            setUploading(false);
+            return;
+          }
+        } else {
+          const { data: urlData } = supabase.storage
+            .from("classroom-files")
+            .getPublicUrl(storagePath);
+          uploadedFileUrl = urlData?.publicUrl || null;
+        }
+      } catch (err) {
+        console.error("Material upload error:", err);
+        toast(`File upload error: ${err.message}`, "danger");
+        setUploading(false);
+        return;
+      }
+    }
+
+    const fullPayload = {
+      class_id: cls.id,
+      title: materialTitle,
+      category: matForm.category || "Lecture Slides",
+      type: matForm.type || "PDF Document",
+      description: matForm.desc.trim() || `Course resource: ${uploadedFileName || materialTitle}`,
+      file_size: uploadedFileSize,
+      file_url: uploadedFileUrl,
+      file_name: uploadedFileName,
+      posted_by: user.id,
+    };
+
+    let { error } = await supabase.from("materials").insert(fullPayload);
+
+    if (error && (error.message?.includes("category") || error.message?.includes("type") || error.message?.includes("file_size") || error.message?.includes("posted_by") || error.message?.includes("file_name"))) {
+      console.warn("Retrying material insert with core columns only:", error.message);
+      const corePayload = {
+        class_id: cls.id,
+        title: materialTitle,
+        description: matForm.desc.trim() || `Course resource: ${uploadedFileName || materialTitle}`,
+        file_url: uploadedFileUrl,
+      };
+      const res = await supabase.from("materials").insert(corePayload);
+      error = res.error;
+    }
+
+    setUploading(false);
 
     if (error) {
       console.error("Material insert error:", error);
@@ -2385,8 +2590,9 @@ const submitActivity = async () => {
 
     await reloadMaterials();
     setMatForm(EMPTY_MATERIAL_FORM);
+    setMatFile(null);
     closeModal();
-    toast(`Material "${title}" added to class hub!`);
+    toast(`Material "${materialTitle}" added to class hub!`);
   };
 
   const openReview = (sub) => {
@@ -2650,6 +2856,17 @@ const submitGrade = async () => {
                                     Awaiting Professor Grade
                                   </span>
                                 )}
+                                {mySub.fileUrl && (
+                                  <a
+                                    href={mySub.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download={mySub.fileName || true}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded hover:bg-accent hover:text-white transition-colors"
+                                  >
+                                    📎 {mySub.fileName || "View Uploaded File"}
+                                  </a>
+                                )}
                               </>
                             ) : (
                               <span className={badge("pending")}>
@@ -2747,6 +2964,18 @@ const submitGrade = async () => {
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-2">
+                                    {sub.fileUrl && (
+                                      <a
+                                        href={sub.fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download={sub.fileName || true}
+                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 hover:bg-accent hover:text-white px-2.5 py-1 rounded-md transition-colors"
+                                        title="Open student uploaded file"
+                                      >
+                                        📎 {sub.fileName ? (sub.fileName.length > 20 ? sub.fileName.slice(0, 18) + '...' : sub.fileName) : 'View File'}
+                                      </a>
+                                    )}
                                     <button
                                       type="button"
                                       className={btn(
@@ -2860,18 +3089,33 @@ const submitGrade = async () => {
                   </div>
                   <div className="flex justify-between items-center pt-3 border-t border-line">
                     <span className="text-[11px] text-muted">
-                      Added {new Date(mat.postedAt).toLocaleDateString()}
+                      Added {mat.postedAt ? new Date(mat.postedAt).toLocaleDateString() : 'Recently'}
                     </span>
-                    <button
-                      type="button"
-                      className={btn(
-                        "secondary",
-                        "!text-[11px] !px-3 !py-[5px]",
-                      )}
-                      onClick={() => toast(`Downloading "${mat.title}"...`)}
-                    >
-                      Download <Icon name="download" size={14} />
-                    </button>
+                    {mat.fileUrl ? (
+                      <a
+                        href={mat.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={mat.fileName || mat.title}
+                        className={btn(
+                          "secondary",
+                          "!text-[11px] !px-3 !py-[5px] inline-flex items-center gap-1.5",
+                        )}
+                      >
+                        Download <Icon name="download" size={14} />
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        className={btn(
+                          "secondary",
+                          "!text-[11px] !px-3 !py-[5px]",
+                        )}
+                        onClick={() => toast(`Document "${mat.title}" has no direct link attached.`, "info")}
+                      >
+                        Download <Icon name="download" size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -2965,7 +3209,7 @@ const submitGrade = async () => {
             ? `Pass: ${passActivity.title}`
             : "Pass Activity Submission"
         }
-        subtitle="Draft or paste your written activity. It will be reviewed automatically by TagaDetect."
+        subtitle="Submit your activity with written text and/or upload a document file from your device."
         maxWidth={680}
         footer={
           <>
@@ -2973,6 +3217,7 @@ const submitGrade = async () => {
               type="button"
               className={btn("secondary")}
               onClick={closeModal}
+              disabled={uploading}
             >
               Cancel
             </button>
@@ -2980,16 +3225,63 @@ const submitGrade = async () => {
               type="button"
               className={btn("primary")}
               onClick={submitPass}
+              disabled={uploading}
             >
-              Pass & Run Automated Review
+              {uploading ? (
+                <>
+                  Uploading & Submitting... <Icon name="hourglass" size={15} />
+                </>
+              ) : (
+                "Pass & Run Automated Review"
+              )}
             </button>
           </>
         }
       >
+        {/* File Upload Section */}
+        <div className="mb-5 bg-card-inner border border-line rounded-[14px] p-4">
+          <label className="block text-[13px] font-semibold text-main mb-1.5">
+            Attach Document / File (Optional or Primary Submission)
+          </label>
+          <p className="text-xs text-muted mb-3">
+            Upload assignment files directly from your device (PDF, DOCX, TXT, ZIP, Code, etc.)
+          </p>
+
+          {!passFile ? (
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-line hover:border-accent rounded-[12px] p-5 cursor-pointer bg-card transition-colors">
+              <span className="text-2xl mb-1">📁</span>
+              <span className="text-[13px] font-semibold text-main">Click to select file from device</span>
+              <span className="text-[11px] text-muted mt-0.5">Supports PDF, Word, Text, Code, or Archives</span>
+              <input
+                type="file"
+                className="hidden"
+                onChange={handlePassFileChange}
+              />
+            </label>
+          ) : (
+            <div className="flex items-center justify-between p-3 bg-card border border-accent/40 rounded-[12px]">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl">📄</span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-bold text-main truncate">{passFile.name}</div>
+                  <div className="text-[11px] text-muted">{formatBytes(passFile.size)}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPassFile(null)}
+                className="text-xs text-rose hover:underline font-semibold px-2 py-1"
+              >
+                Remove ✕
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="mb-[18px]">
           <div className="flex justify-between items-center mb-1.5">
             <label className="text-[13px] font-semibold text-muted">
-              Your Written Submission
+              Written Submission / Text Notes
             </label>
             <span className="text-xs text-muted">
               {countWords(passText)} words
@@ -2998,15 +3290,15 @@ const submitGrade = async () => {
           <textarea
             value={passText}
             onChange={(e) => setPassText(e.target.value)}
-            placeholder="Type or paste your complete assignment essay, reflection, or technical report here..."
-            className={`${formInputClass} min-h-[200px] text-sm leading-[1.6] resize-y`}
+            placeholder="Type or paste your assignment essay, overview, or notes here for AI integrity analysis..."
+            className={`${formInputClass} min-h-[160px] text-sm leading-[1.6] resize-y`}
           />
         </div>
         <div className="bg-accent/10 border border-accent/25 rounded-lg px-4 py-3 text-xs text-muted">
           <strong className="text-accent">Automated AI Review Notice:</strong>{" "}
           Upon passing, TagaDetect automatically evaluates token shuffling
           heuristics and sentence cadence. Both you and your professor receive
-          the identical diagnostic report.
+          the identical diagnostic report along with access to any uploaded file.
         </div>
       </Modal>
 
@@ -3084,13 +3376,14 @@ const submitGrade = async () => {
         open={modal === "material"}
         onClose={closeModal}
         title="Upload Course Material"
-        subtitle="Add syllabus, lecture slides, manuals, or reference guides"
+        subtitle="Upload learning files from your device and publish to the class hub"
         footer={
           <>
             <button
               type="button"
               className={btn("secondary")}
               onClick={closeModal}
+              disabled={uploading}
             >
               Cancel
             </button>
@@ -3098,12 +3391,61 @@ const submitGrade = async () => {
               type="button"
               className={btn("primary")}
               onClick={submitMaterial}
+              disabled={uploading}
             >
-              Upload to Class Hub
+              {uploading ? (
+                <>
+                  Uploading File... <Icon name="hourglass" size={15} />
+                </>
+              ) : (
+                "Upload to Class Hub"
+              )}
             </button>
           </>
         }
       >
+        {/* File picker from device */}
+        <div className="mb-5 bg-card-inner border border-line rounded-[14px] p-4">
+          <label className="block text-[13px] font-semibold text-main mb-1.5">
+            Select Learning Material File from Device
+          </label>
+          <p className="text-xs text-muted mb-3">
+            Choose a presentation, lecture PDF, syllabus, or lab archive from your computer.
+          </p>
+
+          {!matFile ? (
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-line hover:border-accent rounded-[12px] p-5 cursor-pointer bg-card transition-colors">
+              <span className="text-3xl mb-1.5">📁</span>
+              <span className="text-[13px] font-semibold text-main">Click to browse or drag file here</span>
+              <span className="text-[11px] text-muted mt-0.5">PDF, PPT/PPTX, DOCX, ZIP, or Text files</span>
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleMatFileChange}
+              />
+            </label>
+          ) : (
+            <div className="flex items-center justify-between p-3.5 bg-card border border-accent/40 rounded-[12px]">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl">📄</span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-bold text-main truncate">{matFile.name}</div>
+                  <div className="text-[11px] text-muted">
+                    {formatBytes(matFile.size)} • {matForm.type}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMatFile(null)}
+                className="text-xs text-rose hover:underline font-semibold px-2 py-1"
+              >
+                Change ✕
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="mb-[18px]">
           <label className={formLabelClass}>Document Title</label>
           <input
@@ -3208,6 +3550,31 @@ const submitGrade = async () => {
       >
         {gradeSub && (
           <>
+            {gradeSub.fileUrl && (
+              <div className="mb-[18px] p-3.5 bg-accent/10 border border-accent/30 rounded-[14px] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-2xl">📄</span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-main truncate">
+                      {gradeSub.fileName || "Student Uploaded Document"}
+                    </div>
+                    <div className="text-[11px] text-muted">
+                      {gradeSub.fileSize || "Attachment available for grading"}
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href={gradeSub.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={gradeSub.fileName || true}
+                  className={btn("primary", "!text-xs !px-4 !py-1.5 shrink-0")}
+                >
+                  Open / View File ↗
+                </a>
+              </div>
+            )}
+
             <div className="mb-[18px]">
               <label className={formLabelClass}>Submission Excerpt</label>
               <div className="bg-card-inner border border-line rounded-lg p-3 text-[13px] max-h-[140px] overflow-y-auto text-muted whitespace-pre-wrap">
@@ -4930,6 +5297,9 @@ const mapSubmission = (s) => ({
   grade: s.grade,
   professorFeedback: s.feedback,
   gradedAt: s.graded_at,
+  fileUrl: s.file_url || s.ai_review?.fileUrl || null,
+  fileName: s.file_name || s.ai_review?.fileName || null,
+  fileSize: s.file_size || s.ai_review?.fileSize || null,
 });
 // Converts a row from the classes table into the shape the app uses
 const mapClass = (c) => ({
