@@ -2213,6 +2213,9 @@ function ClassPage({ route }) {
   const [modal, setModal] = useState(null);
   const [passActivity, setPassActivity] = useState(null);
   const [passText, setPassText] = useState("");
+  const [passFile, setPassFile] = useState(null);
+  const [matFile, setMatFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const [reviewId, setReviewId] = useState(null);
   const [gradeId, setGradeId] = useState(null);
   const [gradeScore, setGradeScore] = useState("");
