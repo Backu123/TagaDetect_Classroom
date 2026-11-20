@@ -95,3 +95,36 @@ create policy "Users can delete Classroom Files"
 on storage.objects for delete
 to authenticated
 using (bucket_id = 'classroom-files');
+
+
+-- 4. FIX AI_FEEDBACK TABLE RLS POLICIES (Enables detector feedback submission and stream display)
+alter table public.ai_feedback enable row level security;
+
+drop policy if exists "Anyone can read ai_feedback" on public.ai_feedback;
+drop policy if exists "Authenticated users can read ai_feedback" on public.ai_feedback;
+drop policy if exists "Anyone can insert ai_feedback" on public.ai_feedback;
+drop policy if exists "Authenticated users can insert ai_feedback" on public.ai_feedback;
+drop policy if exists "Authenticated users can update ai_feedback" on public.ai_feedback;
+drop policy if exists "Authenticated users can delete ai_feedback" on public.ai_feedback;
+
+-- Allow public and authenticated users to read detection feedback in stream and admin
+create policy "Anyone can read ai_feedback"
+  on public.ai_feedback for select
+  using (true);
+
+-- Allow both guest visitors and authenticated users to submit detector feedback
+create policy "Anyone can insert ai_feedback"
+  on public.ai_feedback for insert
+  with check (true);
+
+-- Allow authenticated users (e.g. admins) to update feedback
+create policy "Authenticated users can update ai_feedback"
+  on public.ai_feedback for update
+  to authenticated
+  using (true);
+
+-- Allow authenticated users (e.g. admins) to delete feedback
+create policy "Authenticated users can delete ai_feedback"
+  on public.ai_feedback for delete
+  to authenticated
+  using (true);

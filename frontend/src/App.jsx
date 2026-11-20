@@ -3688,7 +3688,7 @@ const submitGrade = async () => {
 /* ---------- AI Detector page ---------- */
 
 function DetectorPage() {
-  const { user, feedback, setFeedback, toast } = useApp();
+  const { user, feedback, setFeedback, reloadFeedback, toast } = useApp();
   const [text, setText] = useState("");
   const [result, setResult] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -3753,13 +3753,12 @@ function DetectorPage() {
       user_role: user ? user.role : "student",
       detected_score: result ? result.overallAiScore : 0,
       accuracy_rating: fbForm.rating,
-      feedback_type: fbForm.type,
+      category: fbForm.type,
       comment,
-      status: "Audited",
     };
 
     const { data: inserted, error } = await supabase
-      .from("detector_feedback")
+      .from("ai_feedback")
       .insert(payload)
       .select()
       .single();
@@ -3770,22 +3769,29 @@ function DetectorPage() {
       return;
     }
 
-    // Optimistically prepend to the local list so the user sees it immediately
-    setFeedback((prev) => [
-      {
-        id: inserted.id,
-        userId: inserted.user_id,
-        userName: inserted.user_name,
-        userRole: inserted.user_role,
-        timestamp: inserted.created_at,
-        detectedScore: inserted.detected_score,
-        accuracyRating: inserted.accuracy_rating,
-        feedbackType: inserted.feedback_type,
-        comment: inserted.comment,
-        status: inserted.status,
-      },
-      ...prev,
-    ]);
+    // Optimistically update local list so the user sees it immediately
+    if (inserted) {
+      setFeedback((prev) => [
+        {
+          id: inserted.id,
+          userId: inserted.user_id,
+          userName: inserted.user_name || (user ? user.name : "Guest User"),
+          userRole: inserted.user_role || (user ? user.role : "student"),
+          timestamp: inserted.created_at || new Date().toISOString(),
+          detectedScore: inserted.detected_score || 0,
+          accuracyRating: inserted.accuracy_rating || fbForm.rating,
+          feedbackType: inserted.category || fbForm.type,
+          comment: inserted.comment || comment,
+          status: "Audited",
+        },
+        ...prev,
+      ]);
+    }
+
+    if (reloadFeedback) {
+      await reloadFeedback();
+    }
+
     setFbForm({
       rating: "highly_accurate",
       type: "Accuracy Feedback",
@@ -5717,6 +5723,7 @@ function App() {
         description: m.description || "",
         fileSize: m.file_size || "0 KB",
         fileUrl: m.file_url || null,
+        fileName: m.file_name || null,
         postedAt: m.created_at ? new Date(m.created_at).toISOString().split("T")[0] : "",
       })),
     );
@@ -5727,12 +5734,8 @@ function App() {
   }, [reloadMaterials]);
 
   const reloadFeedback = useCallback(async () => {
-    if (!session) {
-      setFeedback([]);
-      return;
-    }
     const { data, error } = await supabase
-      .from("detector_feedback")
+      .from("ai_feedback")
       .select("*")
       .order("created_at", { ascending: false });
     if (error) {
@@ -5748,12 +5751,12 @@ function App() {
         timestamp: f.created_at,
         detectedScore: f.detected_score || 0,
         accuracyRating: f.accuracy_rating || "partially_accurate",
-        feedbackType: f.feedback_type || "Accuracy Feedback",
+        feedbackType: f.category || f.feedback_type || "Accuracy Feedback",
         comment: f.comment || "",
-        status: f.status || "Audited",
+        status: "Audited",
       })),
     );
-  }, [session, toast]);
+  }, []);
 
   useEffect(() => {
     reloadFeedback();
