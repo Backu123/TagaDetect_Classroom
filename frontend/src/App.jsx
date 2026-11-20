@@ -1641,7 +1641,7 @@ function HomePage() {
   const {
     user,
     classes,
-    setClasses,
+    reloadClasses,
     activities,
     materials,
     toast,
@@ -1680,7 +1680,7 @@ function HomePage() {
 
   const closeModal = () => setModal(null);
 
-  const submitEnroll = () => {
+  const submitEnroll = async () => {
     if (user.role !== "student") {
       toast("Only students can join class sections.", "warning");
       return;
@@ -1688,38 +1688,23 @@ function HomePage() {
 
     const code = enrollCode.trim().toUpperCase();
     if (!code) {
-      toast("Please enter a 6-character class code.", "warning");
+      toast("Please enter a class code.", "warning");
       return;
     }
 
-    const target = classes.find((c) => c.code.toUpperCase() === code);
-    if (!target) {
-      toast(
-        `Class code "${code}" not found. Try AUT-305, NET-310, or IS-306`,
-        "danger",
-      );
+    const { error } = await supabase.rpc("join_class", { class_code: code });
+    if (error) {
+      toast(error.message, "danger");
       return;
     }
 
-    if (target.studentIds && target.studentIds.includes(user.id)) {
-      toast(`You are already enrolled in ${target.subjectName}!`, "info");
-      closeModal();
-      return;
-    }
-
-    setClasses((prev) =>
-      prev.map((c) =>
-        c.id === target.id
-          ? { ...c, studentIds: [...(c.studentIds || []), user.id] }
-          : c,
-      ),
-    );
+    await reloadClasses();
     setEnrollCode("");
     closeModal();
-    toast(`Successfully joined ${target.subjectName} (${target.section})!`);
+    toast(`Successfully joined class ${code}!`);
   };
 
-  const submitCreate = () => {
+    const submitCreate = async () => {
     if (user.role !== "professor" && user.role !== "admin") {
       toast("Only professors can create new class sections.", "warning");
       return;
@@ -1741,28 +1726,33 @@ function HomePage() {
         .replace(/[^A-Za-z]/g, "")
         .substring(0, 3)
         .toUpperCase() || "CLS";
-    let code;
-    do {
-      code = `${prefix}-${Math.floor(100 + Math.random() * 899)}`;
-    } while (classes.some((c) => c.code === code));
+    const code = `${prefix}-${Math.floor(100 + Math.random() * 899)}`;
 
-    const newClass = {
-      id: `cls_${Date.now()}`,
+    const { error } = await supabase.from("classes").insert({
       code,
-      subjectName: title,
+      subject_name: title,
       section: createForm.section.trim() || "BSCS 3IS-1",
-      professorId: user.id,
-      professorName: user.name,
-      professorAvatar: user.avatar,
       room: createForm.room.trim() || "Lab 305",
       schedule: createForm.schedule.trim() || "Mon/Wed 1:00 PM - 2:30 PM",
       description:
         createForm.desc.trim() ||
         "Academic course section exploring foundational principles and applied projects.",
-      studentIds: ["usr_student_1", "usr_student_2"],
-    };
+      professor_id: user.id,
+      professor_name: user.name,
+      professor_avatar: user.avatar,
+    });
 
-    setClasses((prev) => [newClass, ...prev]);
+    if (error) {
+      toast(
+        error.code === "23505"
+          ? "That class code is already taken. Please click create again."
+          : error.message,
+        "danger",
+      );
+      return;
+    }
+
+    await reloadClasses();
     setCreateForm(EMPTY_CLASS_FORM);
     closeModal();
     toast(`Created section ${title}! Enrollment code: ${code}`);
@@ -2164,6 +2154,15 @@ function countWords(text) {
   return t ? t.split(/\s+/).length : 0;
 }
 
+function formatBytes(bytes, decimals = 1) {
+  if (!bytes || bytes <= 0) return "0 B";
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+
 const hasGrade = (sub) => sub.grade !== undefined && sub.grade !== null;
 
 const EMPTY_ACTIVITY_FORM = {
@@ -2228,22 +2227,28 @@ function ReviewReport({ sub }) {
         </div>
       </div>
 
-      {rev.overallAiScore >= 35 && rev.likelySource && (
-        <div className="bg-card-inner border border-rose-500/30 rounded-xl p-3.5 mb-5 shadow-[0_0_15px_rgba(244,63,94,0.06)]">
-          <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm">🤖</span>
-              <span className="text-xs font-bold uppercase tracking-wider text-rose-400">
-                Predicted AI Model Generator
-              </span>
+      {sub.fileUrl && (
+        <div className="flex items-center justify-between p-4 mb-5 bg-card-inner border border-line rounded-[14px]">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-2xl">📄</span>
+            <div className="min-w-0">
+              <div className="text-sm font-bold text-main truncate">
+                {sub.fileName || "Submitted Attachment"}
+              </div>
+              <div className="text-xs text-muted">
+                {sub.fileSize || "Attached Document"}
+              </div>
             </div>
-            <span className="text-xs font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
-              {rev.likelySource}
-            </span>
           </div>
-          <p className="text-xs text-muted leading-relaxed">
-            Stylistic cadence and syntactic predictability align most closely with <strong className="text-main">{rev.likelySource}</strong>.
-          </p>
+          <a
+            href={sub.fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            download={sub.fileName || true}
+            className={btn("primary", "!text-xs !px-4 !py-1.5 shrink-0")}
+          >
+            Open File ↗
+          </a>
         </div>
       )}
 
@@ -2272,16 +2277,16 @@ function ReviewReport({ sub }) {
 /* ---------- Class page: Activities, Materials, and People ---------- */
 
 function ClassPage({ route }) {
-  const {
+    const {
     user,
     users,
     classes,
     activities,
-    setActivities,
+    reloadActivities,
     materials,
-    setMaterials,
+    reloadMaterials,
     submissions,
-    setSubmissions,
+    reloadSubmissions,
     toast,
   } = useApp();
 
@@ -2289,6 +2294,9 @@ function ClassPage({ route }) {
   const [modal, setModal] = useState(null);
   const [passActivity, setPassActivity] = useState(null);
   const [passText, setPassText] = useState("");
+  const [passFile, setPassFile] = useState(null);
+  const [matFile, setMatFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const [reviewId, setReviewId] = useState(null);
   const [gradeId, setGradeId] = useState(null);
   const [gradeScore, setGradeScore] = useState("");
@@ -2339,9 +2347,7 @@ function ClassPage({ route }) {
 
   const classActivities = activities.filter((a) => a.classId === cls.id);
   const classMaterials = materials.filter((m) => m.classId === cls.id);
-  const enrolled = (cls.studentIds || [])
-    .map((id) => users.find((u) => u.id === id))
-    .filter(Boolean);
+  const enrolled = cls.students || [];
   const instructor = users.find((u) => u.id === cls.professorId);
 
   const reviewSub = submissions.find((s) => s.id === reviewId) || null;
@@ -2350,7 +2356,12 @@ function ClassPage({ route }) {
     ? activities.find((a) => a.id === gradeSub.activityId)
     : null;
 
-  const closeModal = () => setModal(null);
+  const closeModal = () => {
+    setModal(null);
+    setPassFile(null);
+    setMatFile(null);
+    setUploading(false);
+  };
 
   const copyCode = () => {
     try {
@@ -2364,48 +2375,132 @@ function ClassPage({ route }) {
   const openPass = (act) => {
     setPassActivity(act);
     setPassText("");
+    setPassFile(null);
     setModal("pass");
+  };
+
+  const handlePassFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPassFile(file);
+    if (file.type.startsWith("text/") || file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const textContent = ev.target?.result;
+        if (typeof textContent === "string" && !passText) {
+          setPassText(textContent);
+          toast(`Loaded text from ${file.name} for AI analysis!`, "info");
+        }
+      };
+      reader.readAsText(file);
+    }
   };
 
   const submitPass = async () => {
     if (!passActivity) return;
     const text = passText.trim();
-    if (text.length < 30) {
-      toast(
-        "Please write at least 30 characters for your submission.",
-        "warning",
-      );
+    if (!text && !passFile) {
+      toast("Please provide either written text or attach a file.", "warning");
+      return;
+    }
+    if (text.length > 0 && text.length < 15 && !passFile) {
+      toast("Please write at least 15 characters for AI analysis.", "warning");
       return;
     }
 
-    const aiReview = await predictWithBackend(text);
-    const newSub = {
-      id: `sub_${Date.now()}`,
-      activityId: passActivity.id,
-      studentId: user.id,
-      studentName: user.name,
-      studentEmail: user.email,
-      submittedAt: new Date().toISOString(),
-      content: text,
-      wordCount: countWords(text),
-      aiReview,
-      grade: null,
-      professorFeedback: null,
+    setUploading(true);
+    let uploadedFileUrl = null;
+    let uploadedFileName = passFile ? passFile.name : null;
+    let uploadedFileSize = passFile ? formatBytes(passFile.size) : null;
+
+    if (passFile) {
+      try {
+        const safeName = passFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const storagePath = `submissions/${cls.id}/${passActivity.id}/${user.id}_${Date.now()}_${safeName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("classroom-files")
+          .upload(storagePath, passFile, { upsert: true });
+
+        if (uploadErr) {
+          console.warn("Storage upload failed, attempting fallback:", uploadErr);
+          if (passFile.size < 4 * 1024 * 1024) {
+            uploadedFileUrl = await new Promise((resolve) => {
+              const r = new FileReader();
+              r.onload = () => resolve(r.result);
+              r.readAsDataURL(passFile);
+            });
+          } else {
+            toast(`Storage bucket 'classroom-files' not ready: ${uploadErr.message}`, "danger");
+            setUploading(false);
+            return;
+          }
+        } else {
+          const { data: urlData } = supabase.storage
+            .from("classroom-files")
+            .getPublicUrl(storagePath);
+          uploadedFileUrl = urlData?.publicUrl || null;
+        }
+      } catch (err) {
+        console.error("File upload error:", err);
+        toast(`File upload error: ${err.message}`, "danger");
+        setUploading(false);
+        return;
+      }
+    }
+
+    const aiReview = generateSubmissionReview(
+      text || (uploadedFileName ? `Attached document: ${uploadedFileName}. Content submitted for evaluation.` : "")
+    );
+    if (uploadedFileUrl) {
+      aiReview.fileUrl = uploadedFileUrl;
+      aiReview.fileName = uploadedFileName;
+      aiReview.fileSize = uploadedFileSize;
+    }
+
+    const payload = {
+      activity_id: passActivity.id,
+      student_id: user.id,
+      content: text || (uploadedFileName ? `[Attached File: ${uploadedFileName}]` : ""),
+      ai_review: aiReview,
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
     };
 
-    setSubmissions((prev) => [
-      newSub,
-      ...prev.filter(
-        (s) => !(s.activityId === passActivity.id && s.studentId === user.id),
-      ),
-    ]);
-    closeModal();
-    toast(
-      `Activity successfully passed! AI Review: ${aiReview.overallAiScore}% AI.`,
+    let { error } = await supabase.from("submissions").upsert(
+      {
+        ...payload,
+        file_url: uploadedFileUrl,
+        file_name: uploadedFileName,
+        file_size: uploadedFileSize,
+      },
+      { onConflict: "activity_id,student_id" }
     );
+
+    if (error && error.message?.includes("file_url")) {
+      console.warn("Retrying submission upsert without file_url column:", error.message);
+      const res = await supabase.from("submissions").upsert(
+        payload,
+        { onConflict: "activity_id,student_id" }
+      );
+      error = res.error;
+    }
+
+    setUploading(false);
+
+    if (error) {
+      console.error("Submit error:", error);
+      toast(`Could not submit: ${error.message}`, "danger");
+      return;
+    }
+
+    await reloadSubmissions();
+    closeModal();
+    setPassFile(null);
+    toast(`Activity passed successfully! ${uploadedFileName ? "File attached." : ""}`);
   };
 
-  const submitActivity = () => {
+  const submitActivity = async () => {
     const title = actForm.title.trim();
     if (!title) {
       toast("Please provide an activity title.", "warning");
@@ -2416,48 +2511,135 @@ function ClassPage({ route }) {
       100,
       Math.max(10, parseInt(actForm.points, 10) || 100),
     );
-    const newAct = {
-      id: `act_${Date.now()}`,
-      classId: cls.id,
+
+    const { error } = await supabase.from("activities").insert({
+      class_id: cls.id,
       title,
-      description:
+      instructions:
         actForm.instructions.trim() ||
         "Complete the assignment prompt in clear, structured prose.",
-      dueDate: actForm.due || "2026-11-20",
-      maxPoints: points,
+      due_date: actForm.due || null,
+      max_points: points,
       rubric: "Conceptual rigor & clarity",
-      status: "open",
-      createdAt: new Date().toISOString().split("T")[0],
-    };
+    });
 
-    setActivities((prev) => [newAct, ...prev]);
+    if (error) {
+      console.error("Create activity error:", error);
+      toast(`Could not publish: ${error.message}`, "danger");
+      return;
+    }
+
+    await reloadActivities();
     setActForm(EMPTY_ACTIVITY_FORM);
     closeModal();
     toast(`Published activity "${title}"!`);
   };
 
-  const submitMaterial = () => {
+  const handleMatFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMatFile(file);
+    if (!matForm.title) {
+      const baseName = file.name.replace(/\.[^/.]+$/, "");
+      setMatForm((prev) => ({ ...prev, title: baseName }));
+    }
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    let detectedType = "PDF Document";
+    if (["ppt", "pptx", "key"].includes(ext)) detectedType = "Slide Presentation";
+    else if (["doc", "docx", "odt", "rtf"].includes(ext)) detectedType = "Word Document";
+    else if (["zip", "tar", "gz", "rar", "7z", "py", "java", "cpp", "js"].includes(ext)) detectedType = "Interactive Lab Tool";
+    setMatForm((prev) => ({ ...prev, type: detectedType }));
+  };
+
+  const submitMaterial = async () => {
     const title = matForm.title.trim();
-    if (!title) {
-      toast("Please provide a document title.", "warning");
+    if (!title && !matFile) {
+      toast("Please provide a document title or choose a file from your device.", "warning");
       return;
     }
 
-    const newMat = {
-      id: `mat_${Date.now()}`,
-      classId: cls.id,
-      title,
-      category: matForm.category,
-      type: matForm.type,
-      description: matForm.desc.trim() || "Official course document.",
-      postedAt: new Date().toISOString().split("T")[0],
-      fileSize: "1.8 MB",
+    const materialTitle = title || matFile?.name || "Untitled Material";
+    setUploading(true);
+
+    let uploadedFileUrl = null;
+    let uploadedFileName = matFile ? matFile.name : null;
+    let uploadedFileSize = matFile ? formatBytes(matFile.size) : "1.8 MB";
+
+    if (matFile) {
+      try {
+        const safeName = matFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const storagePath = `materials/${cls.id}/${Date.now()}_${safeName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("classroom-files")
+          .upload(storagePath, matFile, { upsert: true });
+
+        if (uploadErr) {
+          console.warn("Material storage upload error:", uploadErr);
+          if (matFile.size < 4 * 1024 * 1024) {
+            uploadedFileUrl = await new Promise((resolve) => {
+              const r = new FileReader();
+              r.onload = () => resolve(r.result);
+              r.readAsDataURL(matFile);
+            });
+          } else {
+            toast(`Storage bucket 'classroom-files' not ready: ${uploadErr.message}`, "danger");
+            setUploading(false);
+            return;
+          }
+        } else {
+          const { data: urlData } = supabase.storage
+            .from("classroom-files")
+            .getPublicUrl(storagePath);
+          uploadedFileUrl = urlData?.publicUrl || null;
+        }
+      } catch (err) {
+        console.error("Material upload error:", err);
+        toast(`File upload error: ${err.message}`, "danger");
+        setUploading(false);
+        return;
+      }
+    }
+
+    const fullPayload = {
+      class_id: cls.id,
+      title: materialTitle,
+      category: matForm.category || "Lecture Slides",
+      type: matForm.type || "PDF Document",
+      description: matForm.desc.trim() || `Course resource: ${uploadedFileName || materialTitle}`,
+      file_size: uploadedFileSize,
+      file_url: uploadedFileUrl,
+      file_name: uploadedFileName,
+      posted_by: user.id,
     };
 
-    setMaterials((prev) => [newMat, ...prev]);
+    let { error } = await supabase.from("materials").insert(fullPayload);
+
+    if (error && (error.message?.includes("category") || error.message?.includes("type") || error.message?.includes("file_size") || error.message?.includes("posted_by") || error.message?.includes("file_name"))) {
+      console.warn("Retrying material insert with core columns only:", error.message);
+      const corePayload = {
+        class_id: cls.id,
+        title: materialTitle,
+        description: matForm.desc.trim() || `Course resource: ${uploadedFileName || materialTitle}`,
+        file_url: uploadedFileUrl,
+      };
+      const res = await supabase.from("materials").insert(corePayload);
+      error = res.error;
+    }
+
+    setUploading(false);
+
+    if (error) {
+      console.error("Material insert error:", error);
+      toast(`Could not add material: ${error.message}`, "danger");
+      return;
+    }
+
+    await reloadMaterials();
     setMatForm(EMPTY_MATERIAL_FORM);
+    setMatFile(null);
     closeModal();
-    toast(`Material "${title}" added to class hub!`);
+    toast(`Material "${materialTitle}" added to class hub!`);
   };
 
   const openReview = (sub) => {
@@ -2472,32 +2654,36 @@ function ClassPage({ route }) {
     setModal("grade");
   };
 
-  const submitGrade = () => {
-    if (!gradeSub) return;
-    const max = gradeActivity ? gradeActivity.maxPoints : 100;
-    const score = parseFloat(gradeScore);
+const submitGrade = async () => {
+  if (!gradeSub) return;
+  const max = gradeActivity ? gradeActivity.maxPoints : 100;
+  const score = parseFloat(gradeScore);
 
-    if (Number.isNaN(score) || score < 0 || score > max) {
-      toast(`Enter a score between 0 and ${max}.`, "warning");
-      return;
-    }
+  if (Number.isNaN(score) || score < 0 || score > max) {
+    toast(`Enter a score between 0 and ${max}.`, "warning");
+    return;
+  }
 
-    setSubmissions((prev) =>
-      prev.map((s) =>
-        s.id === gradeSub.id
-          ? {
-              ...s,
-              grade: score,
-              professorFeedback: gradeFeedback.trim(),
-              gradedAt: new Date().toISOString(),
-              gradedBy: user.name,
-            }
-          : s,
-      ),
-    );
-    closeModal();
-    toast(`Grade recorded for ${gradeSub.studentName}!`);
-  };
+  const { error } = await supabase
+    .from("submissions")
+    .update({
+      grade: score,
+      feedback: gradeFeedback.trim(),
+      graded_at: new Date().toISOString(),
+      status: "graded",
+    })
+    .eq("id", gradeSub.id);
+
+  if (error) {
+    console.error("Grade error:", error);
+    toast(`Could not save grade: ${error.message}`, "danger");
+    return;
+  }
+
+  await reloadSubmissions();
+  closeModal();
+  toast(`Grade recorded for ${gradeSub.studentName}!`);
+};
 
   const setActField = (field) => (e) =>
     setActForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -2717,6 +2903,17 @@ function ClassPage({ route }) {
                                     Awaiting Professor Grade
                                   </span>
                                 )}
+                                {mySub.fileUrl && (
+                                  <a
+                                    href={mySub.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download={mySub.fileName || true}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded hover:bg-accent hover:text-white transition-colors"
+                                  >
+                                    📎 {mySub.fileName || "View Uploaded File"}
+                                  </a>
+                                )}
                               </>
                             ) : (
                               <span className={badge("pending")}>
@@ -2814,6 +3011,18 @@ function ClassPage({ route }) {
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-2">
+                                    {sub.fileUrl && (
+                                      <a
+                                        href={sub.fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        download={sub.fileName || true}
+                                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-accent bg-accent/10 hover:bg-accent hover:text-white px-2.5 py-1 rounded-md transition-colors"
+                                        title="Open student uploaded file"
+                                      >
+                                        📎 {sub.fileName ? (sub.fileName.length > 20 ? sub.fileName.slice(0, 18) + '...' : sub.fileName) : 'View File'}
+                                      </a>
+                                    )}
                                     <button
                                       type="button"
                                       className={btn(
@@ -2927,18 +3136,33 @@ function ClassPage({ route }) {
                   </div>
                   <div className="flex justify-between items-center pt-3 border-t border-line">
                     <span className="text-[11px] text-muted">
-                      Added {new Date(mat.postedAt).toLocaleDateString()}
+                      Added {mat.postedAt ? new Date(mat.postedAt).toLocaleDateString() : 'Recently'}
                     </span>
-                    <button
-                      type="button"
-                      className={btn(
-                        "secondary",
-                        "!text-[11px] !px-3 !py-[5px]",
-                      )}
-                      onClick={() => toast(`Downloading "${mat.title}"...`)}
-                    >
-                      Download <Icon name="download" size={14} />
-                    </button>
+                    {mat.fileUrl ? (
+                      <a
+                        href={mat.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download={mat.fileName || mat.title}
+                        className={btn(
+                          "secondary",
+                          "!text-[11px] !px-3 !py-[5px] inline-flex items-center gap-1.5",
+                        )}
+                      >
+                        Download <Icon name="download" size={14} />
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        className={btn(
+                          "secondary",
+                          "!text-[11px] !px-3 !py-[5px]",
+                        )}
+                        onClick={() => toast(`Document "${mat.title}" has no direct link attached.`, "info")}
+                      >
+                        Download <Icon name="download" size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -3032,7 +3256,7 @@ function ClassPage({ route }) {
             ? `Pass: ${passActivity.title}`
             : "Pass Activity Submission"
         }
-        subtitle="Draft or paste your written activity. It will be reviewed automatically by TagaDetect."
+        subtitle="Submit your activity with written text and/or upload a document file from your device."
         maxWidth={680}
         footer={
           <>
@@ -3040,6 +3264,7 @@ function ClassPage({ route }) {
               type="button"
               className={btn("secondary")}
               onClick={closeModal}
+              disabled={uploading}
             >
               Cancel
             </button>
@@ -3047,16 +3272,63 @@ function ClassPage({ route }) {
               type="button"
               className={btn("primary")}
               onClick={submitPass}
+              disabled={uploading}
             >
-              Pass & Run Automated Review
+              {uploading ? (
+                <>
+                  Uploading & Submitting... <Icon name="hourglass" size={15} />
+                </>
+              ) : (
+                "Pass & Run Automated Review"
+              )}
             </button>
           </>
         }
       >
+        {/* File Upload Section */}
+        <div className="mb-5 bg-card-inner border border-line rounded-[14px] p-4">
+          <label className="block text-[13px] font-semibold text-main mb-1.5">
+            Attach Document / File (Optional or Primary Submission)
+          </label>
+          <p className="text-xs text-muted mb-3">
+            Upload assignment files directly from your device (PDF, DOCX, TXT, ZIP, Code, etc.)
+          </p>
+
+          {!passFile ? (
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-line hover:border-accent rounded-[12px] p-5 cursor-pointer bg-card transition-colors">
+              <span className="text-2xl mb-1">📁</span>
+              <span className="text-[13px] font-semibold text-main">Click to select file from device</span>
+              <span className="text-[11px] text-muted mt-0.5">Supports PDF, Word, Text, Code, or Archives</span>
+              <input
+                type="file"
+                className="hidden"
+                onChange={handlePassFileChange}
+              />
+            </label>
+          ) : (
+            <div className="flex items-center justify-between p-3 bg-card border border-accent/40 rounded-[12px]">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl">📄</span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-bold text-main truncate">{passFile.name}</div>
+                  <div className="text-[11px] text-muted">{formatBytes(passFile.size)}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPassFile(null)}
+                className="text-xs text-rose hover:underline font-semibold px-2 py-1"
+              >
+                Remove ✕
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="mb-[18px]">
           <div className="flex justify-between items-center mb-1.5">
             <label className="text-[13px] font-semibold text-muted">
-              Your Written Submission
+              Written Submission / Text Notes
             </label>
             <span className="text-xs text-muted">
               {countWords(passText)} words
@@ -3065,15 +3337,15 @@ function ClassPage({ route }) {
           <textarea
             value={passText}
             onChange={(e) => setPassText(e.target.value)}
-            placeholder="Type or paste your complete assignment essay, reflection, or technical report here..."
-            className={`${formInputClass} min-h-[200px] text-sm leading-[1.6] resize-y`}
+            placeholder="Type or paste your assignment essay, overview, or notes here for AI integrity analysis..."
+            className={`${formInputClass} min-h-[160px] text-sm leading-[1.6] resize-y`}
           />
         </div>
         <div className="bg-accent/10 border border-accent/25 rounded-lg px-4 py-3 text-xs text-muted">
           <strong className="text-accent">Automated AI Review Notice:</strong>{" "}
           Upon passing, TagaDetect automatically evaluates token shuffling
           heuristics and sentence cadence. Both you and your professor receive
-          the identical diagnostic report.
+          the identical diagnostic report along with access to any uploaded file.
         </div>
       </Modal>
 
@@ -3151,13 +3423,14 @@ function ClassPage({ route }) {
         open={modal === "material"}
         onClose={closeModal}
         title="Upload Course Material"
-        subtitle="Add syllabus, lecture slides, manuals, or reference guides"
+        subtitle="Upload learning files from your device and publish to the class hub"
         footer={
           <>
             <button
               type="button"
               className={btn("secondary")}
               onClick={closeModal}
+              disabled={uploading}
             >
               Cancel
             </button>
@@ -3165,12 +3438,61 @@ function ClassPage({ route }) {
               type="button"
               className={btn("primary")}
               onClick={submitMaterial}
+              disabled={uploading}
             >
-              Upload to Class Hub
+              {uploading ? (
+                <>
+                  Uploading File... <Icon name="hourglass" size={15} />
+                </>
+              ) : (
+                "Upload to Class Hub"
+              )}
             </button>
           </>
         }
       >
+        {/* File picker from device */}
+        <div className="mb-5 bg-card-inner border border-line rounded-[14px] p-4">
+          <label className="block text-[13px] font-semibold text-main mb-1.5">
+            Select Learning Material File from Device
+          </label>
+          <p className="text-xs text-muted mb-3">
+            Choose a presentation, lecture PDF, syllabus, or lab archive from your computer.
+          </p>
+
+          {!matFile ? (
+            <label className="flex flex-col items-center justify-center border-2 border-dashed border-line hover:border-accent rounded-[12px] p-5 cursor-pointer bg-card transition-colors">
+              <span className="text-3xl mb-1.5">📁</span>
+              <span className="text-[13px] font-semibold text-main">Click to browse or drag file here</span>
+              <span className="text-[11px] text-muted mt-0.5">PDF, PPT/PPTX, DOCX, ZIP, or Text files</span>
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleMatFileChange}
+              />
+            </label>
+          ) : (
+            <div className="flex items-center justify-between p-3.5 bg-card border border-accent/40 rounded-[12px]">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl">📄</span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-bold text-main truncate">{matFile.name}</div>
+                  <div className="text-[11px] text-muted">
+                    {formatBytes(matFile.size)} • {matForm.type}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMatFile(null)}
+                className="text-xs text-rose hover:underline font-semibold px-2 py-1"
+              >
+                Change ✕
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="mb-[18px]">
           <label className={formLabelClass}>Document Title</label>
           <input
@@ -3275,6 +3597,31 @@ function ClassPage({ route }) {
       >
         {gradeSub && (
           <>
+            {gradeSub.fileUrl && (
+              <div className="mb-[18px] p-3.5 bg-accent/10 border border-accent/30 rounded-[14px] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-2xl">📄</span>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-main truncate">
+                      {gradeSub.fileName || "Student Uploaded Document"}
+                    </div>
+                    <div className="text-[11px] text-muted">
+                      {gradeSub.fileSize || "Attachment available for grading"}
+                    </div>
+                  </div>
+                </div>
+                <a
+                  href={gradeSub.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download={gradeSub.fileName || true}
+                  className={btn("primary", "!text-xs !px-4 !py-1.5 shrink-0")}
+                >
+                  Open / View File ↗
+                </a>
+              </div>
+            )}
+
             <div className="mb-[18px]">
               <label className={formLabelClass}>Submission Excerpt</label>
               <div className="bg-card-inner border border-line rounded-lg p-3 text-[13px] max-h-[140px] overflow-y-auto text-muted whitespace-pre-wrap">
@@ -3390,7 +3737,7 @@ function DetectorPage() {
     setResult(null);
   };
 
-  const submitFeedback = () => {
+  const submitFeedback = async () => {
     const comment = fbForm.comment.trim();
     if (!comment) {
       toast(
@@ -3400,20 +3747,45 @@ function DetectorPage() {
       return;
     }
 
-    const entry = {
-      id: `fb_${Date.now()}`,
-      userId: user ? user.id : "usr_guest",
-      userName: user ? user.name : "Guest User",
-      userRole: user ? user.role : "student",
-      timestamp: new Date().toISOString(),
-      detectedScore: result ? result.overallAiScore : 0,
-      accuracyRating: fbForm.rating,
-      feedbackType: fbForm.type,
+    const payload = {
+      user_id: user ? user.id : null,
+      user_name: user ? user.name : "Guest User",
+      user_role: user ? user.role : "student",
+      detected_score: result ? result.overallAiScore : 0,
+      accuracy_rating: fbForm.rating,
+      feedback_type: fbForm.type,
       comment,
       status: "Audited",
     };
 
-    setFeedback((prev) => [entry, ...prev]);
+    const { data: inserted, error } = await supabase
+      .from("detector_feedback")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Feedback insert error:", error);
+      toast(`Could not save feedback: ${error.message}`, "danger");
+      return;
+    }
+
+    // Optimistically prepend to the local list so the user sees it immediately
+    setFeedback((prev) => [
+      {
+        id: inserted.id,
+        userId: inserted.user_id,
+        userName: inserted.user_name,
+        userRole: inserted.user_role,
+        timestamp: inserted.created_at,
+        detectedScore: inserted.detected_score,
+        accuracyRating: inserted.accuracy_rating,
+        feedbackType: inserted.feedback_type,
+        comment: inserted.comment,
+        status: inserted.status,
+      },
+      ...prev,
+    ]);
     setFbForm({
       rating: "highly_accurate",
       type: "Accuracy Feedback",
@@ -5001,17 +5373,21 @@ function AdminPage() {
     (u) => u.role === "professor" && u.status === "pending",
   );
 
-  const approve = (target) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === target.id ? { ...u, status: "approved" } : u)),
-    );
-    toast(`Approved ${target.name}! Faculty permissions now active.`);
-  };
+  const approve = async (target) => {
+  const { error } = await supabase.rpc("set_professor_status",
+    { target: target.id, new_status: "approved", reason: null });
+  if (error) return toast(error.message, "danger");
+  setUsers((prev) => prev.map((u) => u.id === target.id ? { ...u, status: "approved" } : u));
+  toast(`Approved ${target.name}! Faculty permissions now active.`);
+};
 
-  const reject = (target) => {
-    setUsers((prev) => prev.filter((u) => u.id !== target.id));
-    toast(`Registration request for ${target.name} rejected.`, "warning");
-  };
+  const reject = async (target) => {
+  const { error } = await supabase.rpc("set_professor_status",
+    { target: target.id, new_status: "rejected", reason: null });
+  if (error) return toast(error.message, "danger");
+  setUsers((prev) => prev.map((u) => u.id === target.id ? { ...u, status: "rejected" } : u));
+  toast(`Registration for ${target.name} rejected.`, "warning");
+};
 
   return (
     <div>
@@ -5178,6 +5554,54 @@ const PAGES = {
   admin: AdminPage,
 };
 
+const mapActivity = (a) => ({
+  id: a.id,
+  classId: a.class_id,
+  title: a.title,
+  description: a.instructions,
+  dueDate: a.due_date ? new Date(a.due_date).toLocaleDateString() : null,
+  maxPoints: a.max_points,
+  rubric: a.rubric,
+  status: "open",
+  createdAt: a.created_at,
+});
+const mapSubmission = (s) => ({
+  id: s.id,
+  activityId: s.activity_id,
+  studentId: s.student_id,
+  studentName: s.profiles?.full_name || s.profiles?.username || "Student",
+  studentEmail: s.profiles?.email,
+  submittedAt: s.submitted_at,
+  content: s.content || "",
+  wordCount: countWords(s.content || ""),
+  aiReview: s.ai_review,
+  grade: s.grade,
+  professorFeedback: s.feedback,
+  gradedAt: s.graded_at,
+  fileUrl: s.file_url || s.ai_review?.fileUrl || null,
+  fileName: s.file_name || s.ai_review?.fileName || null,
+  fileSize: s.file_size || s.ai_review?.fileSize || null,
+});
+// Converts a row from the classes table into the shape the app uses
+const mapClass = (c) => ({
+  id: c.id,
+  code: c.code,
+  subjectName: c.subject_name,
+  section: c.section,
+  room: c.room,
+  schedule: c.schedule,
+  description: c.description,
+  professorId: c.professor_id,
+  professorName: c.professor_name,
+  professorAvatar: c.professor_avatar,
+  studentIds: (c.enrollments || []).map((e) => e.student_id),
+  students: (c.enrollments || []).map((e) => ({
+    id: e.student_id,
+    name: e.profiles?.full_name || e.profiles?.username || "Student",
+    email: e.profiles?.email,
+    avatar: e.profiles?.avatar_url,
+  })),
+});
 /* =====================================================================
    SECTION 6: APP (holds all the data and decides which page to show)
    ===================================================================== */
@@ -5186,48 +5610,189 @@ function App() {
   const route = useRoute();
 
   const [theme, setTheme] = usePersistedState(STORAGE_KEYS.THEME, "dark");
-  const [users, setUsers] = usePersistedState(
-    STORAGE_KEYS.USERS,
-    INITIAL_USERS,
-  );
-  const [classes, setClasses] = usePersistedState(
-    STORAGE_KEYS.CLASSES,
-    INITIAL_CLASSES,
-  );
-  const [activities, setActivities] = usePersistedState(
-    STORAGE_KEYS.ACTIVITIES,
-    INITIAL_ACTIVITIES,
-  );
-  const [materials, setMaterials] = usePersistedState(
-    STORAGE_KEYS.MATERIALS,
-    INITIAL_MATERIALS,
-  );
-  const [submissions, setSubmissions] = usePersistedState(
-    STORAGE_KEYS.SUBMISSIONS,
-    INITIAL_SUBMISSIONS,
-  );
-  const [feedback, setFeedback] = usePersistedState(
-    STORAGE_KEYS.FEEDBACK,
-    INITIAL_FEEDBACK,
-  );
+  const [users, setUsers] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [activities, setActivities] = useState([]);
+  const [materials, setMaterials] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [feedback, setFeedback] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Restore the session on page load and listen for sign in / sign out
+  const toast = useCallback((message, type = "success") => {
+  const id = Date.now() + Math.random();
+  setToasts((prev) => [...prev, { id, message, type }]);
+  setTimeout(() => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, 3200);
+  }, []);
+
+    // Load the classes this user is allowed to see (RLS filters them)
+  const reloadClasses = useCallback(async () => {
+    if (!session) {
+      setClasses([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("classes")
+      .select("*, enrollments(student_id, profiles(full_name, username, email, avatar_url))")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Classes load error:", error);
+      toast(`Could not load classes: ${error.message}`, "danger");
+      return;
+    }
+    setClasses((data || []).map(mapClass));
+  }, [session, toast]);
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (!data.session) setAuthLoading(false);
-    });
+    reloadClasses();
+  }, [reloadClasses]);
+
+  const reloadActivities = useCallback(async () => {
+    if (!session) {
+      setActivities([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("activities")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Activities load error:", error);
+      toast(`Could not load activities: ${error.message}`, "danger");
+      return;
+    }
+    setActivities((data || []).map(mapActivity));
+  }, [session, toast]);
+
+  useEffect(() => {
+    reloadActivities();
+  }, [reloadActivities]);
+
+  const reloadSubmissions = useCallback(async () => {
+    if (!session) {
+      setSubmissions([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("submissions")
+      .select("*, profiles(full_name, username, email)")
+      .order("submitted_at", { ascending: false });
+    if (error) {
+      console.error("Submissions load error:", error);
+      toast(`Could not load submissions: ${error.message}`, "danger");
+      return;
+    }
+    setSubmissions((data || []).map(mapSubmission));
+  }, [session, toast]);
+
+  useEffect(() => {
+    reloadSubmissions();
+  }, [reloadSubmissions]);
+
+  const reloadMaterials = useCallback(async () => {
+    if (!session) {
+      setMaterials([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("materials")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Materials load error:", error);
+      toast(`Could not load materials: ${error.message}`, "danger");
+      return;
+    }
+    setMaterials(
+      (data || []).map((m) => ({
+        id: m.id,
+        classId: m.class_id,
+        title: m.title,
+        category: m.category,
+        type: m.type,
+        description: m.description || "",
+        fileSize: m.file_size || "0 KB",
+        fileUrl: m.file_url || null,
+        postedAt: m.created_at ? new Date(m.created_at).toISOString().split("T")[0] : "",
+      })),
+    );
+  }, [session, toast]);
+
+  useEffect(() => {
+    reloadMaterials();
+  }, [reloadMaterials]);
+
+  const reloadFeedback = useCallback(async () => {
+    if (!session) {
+      setFeedback([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("detector_feedback")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Feedback load error:", error);
+      return;
+    }
+    setFeedback(
+      (data || []).map((f) => ({
+        id: f.id,
+        userId: f.user_id,
+        userName: f.user_name || "User",
+        userRole: f.user_role || "student",
+        timestamp: f.created_at,
+        detectedScore: f.detected_score || 0,
+        accuracyRating: f.accuracy_rating || "partially_accurate",
+        feedbackType: f.feedback_type || "Accuracy Feedback",
+        comment: f.comment || "",
+        status: f.status || "Audited",
+      })),
+    );
+  }, [session, toast]);
+
+  useEffect(() => {
+    reloadFeedback();
+  }, [reloadFeedback]);
+
+
+    // Restore the session on page load and listen for sign in / sign out
+  useEffect(() => {
+    let active = true;
+
+    // Safety net: never stay on a blank screen forever
+    const timer = setTimeout(() => {
+      if (active) setAuthLoading(false);
+    }, 4000);
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+        if (!data.session) setAuthLoading(false);
+      })
+      .catch((err) => {
+        console.error("getSession failed:", err);
+        if (active) setAuthLoading(false);
+      });
+
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
         if (newSession) setAuthLoading(true);
         setSession(newSession);
       },
     );
-    return () => listener.subscription.unsubscribe();
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   // Load the profile row that belongs to the signed in user
@@ -5259,27 +5824,30 @@ function App() {
     };
   }, [session]);
 
-    // Block Google sign in for emails that never registered
+    // Load all accounts from the profiles table.
+  // Admins get every row; everyone else only gets their own (set by RLS).
   useEffect(() => {
-    if (!session) return;
-    const intent = localStorage.getItem("tagadetect_oauth_intent");
-    if (!intent) return;
-    localStorage.removeItem("tagadetect_oauth_intent");
-    if (intent !== "login") return;
-
-    const u = session.user;
-    const justCreated =
-      Math.abs(new Date(u.last_sign_in_at) - new Date(u.created_at)) < 15000;
-    if (!justCreated) return;
-
-    (async () => {
-      await supabase.rpc("delete_own_account");
-      await supabase.auth.signOut();
-      setProfile(null);
-      toast("No account found for this Google email. Please sign up first.", "warning");
-      navigate("signup");
-    })();
-  }, [session]);
+    if (!session) {
+      setUsers([]);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("*")
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Users load error:", error);
+          return;
+        }
+        setUsers(
+          (data || []).map((p) => ({
+            ...p,
+            name: p.full_name || p.username || p.email || "User",
+            avatar: p.avatar_url,
+          })),
+        );
+      });
+  }, [session, profile?.status, profile?.role]);
 
   // Same shape the rest of your app already expects
   const user = profile
@@ -5312,14 +5880,7 @@ function App() {
     if (blocked) navigate("login");
   }, [blocked]);
 
-  const toast = useCallback((message, type = "success") => {
-    const id = Date.now() + Math.random();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3200);
-  }, []);
-
+  
   const toggleTheme = () => {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
@@ -5341,13 +5902,17 @@ function App() {
     toast("Signed out successfully.", "info");
     navigate("login");
   };
-  const ctx = {
+    const ctx = {
     user,
     setProfile,
     users,
     setUsers,
     classes,
-    setClasses,
+    reloadClasses,
+    reloadActivities,
+    reloadSubmissions,
+    reloadMaterials,
+    reloadFeedback,
     activities,
     setActivities,
     materials,
