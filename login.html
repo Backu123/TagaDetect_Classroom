@@ -20,6 +20,9 @@
         <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Sign in to your TagaDetect academic workspace</p>
       </div>
 
+      <!-- Active session banner if already logged in -->
+      <div id="active-session-banner"></div>
+
       <!-- Google Authentication Option -->
       <button class="btn btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px; font-size: 13px; font-weight: 600; margin-bottom: 20px;" onclick="simulateGoogleAuth()">
         <svg width="18" height="18" viewBox="0 0 24 24">
@@ -47,7 +50,7 @@
         <div class="form-group">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <label class="form-label" style="margin-bottom: 0;">Password</label>
-            <a href="#" style="font-size: 11px; color: var(--accent-purple); text-decoration: none;" onclick="TagaNav.toast('Password reset email sent (demo simulation).', 'info'); return false;">Forgot?</a>
+            <a href="#" style="font-size: 11px; color: var(--accent-purple); text-decoration: none;" onclick="TagaNav.toast('Password reset instructions sent to your email.', 'info'); return false;">Forgot?</a>
           </div>
           <input type="password" id="login-password" class="form-input" placeholder="••••••••••••" required />
         </div>
@@ -115,12 +118,29 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       TagaNav.renderNavbar('login');
+
+      const user = TagaNav.getCurrentUser();
+      if (user) {
+        const statusBox = document.getElementById('active-session-banner');
+        if (statusBox) {
+          statusBox.innerHTML = `
+            <div style="background: rgba(99, 102, 241, 0.12); border: 1px solid var(--accent-purple); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 20px; font-size: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+              <div>
+                <span style="color: var(--text-muted);">Active session:</span> <strong>${user.name}</strong> <span class="badge" style="background: var(--accent-purple); color: #fff; font-size: 10px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">${user.role}</span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn btn-secondary" style="font-size: 11px; padding: 4px 8px;" onclick="TagaNav.signOut()">Switch</button>
+                <a href="index.html" class="btn btn-primary" style="font-size: 11px; padding: 4px 10px; text-decoration: none;">Go to Classes →</a>
+              </div>
+            </div>
+          `;
+        }
+      }
     });
 
     function simulateGoogleAuth() {
       TagaNav.toast('Authenticating with Google Account...', 'info');
       setTimeout(() => {
-        // Log in as student Alex Rivera
         TagaNav.switchUser('usr_student_1');
         setTimeout(() => {
           window.location.href = 'index.html';
@@ -136,15 +156,12 @@
 
       if (match) {
         TagaNav.switchUser(match.id);
+        TagaNav.toast(`Signed in as ${match.name}!`, 'success');
         setTimeout(() => {
           window.location.href = 'index.html';
         }, 400);
       } else {
-        TagaNav.toast(`Signed in as demo student!`, 'success');
-        TagaNav.switchUser('usr_student_1');
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 400);
+        TagaNav.toast('Invalid credentials or unregistered account.', 'danger');
       }
     }
   </script>

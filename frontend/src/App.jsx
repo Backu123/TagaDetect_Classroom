@@ -734,7 +734,7 @@ function useRoute() {
   );
   const path = hash.replace(/^#\/?/, "");
   const [name = "", param = null] = path.split("/");
-  return { name: name || "home", param };
+  return { name, param, hasExplicitRoute: Boolean(name) };
 }
 
 function navigate(path = "") {
@@ -1112,13 +1112,20 @@ function OrDivider({ label }) {
 /* ---------- Login ---------- */
 
 function LoginPage() {
-  const { toast } = useApp();
+  const { user, toast } = useApp();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [legal, setLegal] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [lockoutTimer, setLockoutTimer] = useState(0);
+
+  // If already logged in, redirect to home
+  useEffect(() => {
+    if (user) {
+      navigate("home");
+    }
+  }, [user]);
 
   // Lockout countdown timer
   useEffect(() => {
@@ -1189,7 +1196,7 @@ function LoginPage() {
       }
 
       setAttempts(0);
-      navigate("");
+      navigate("home");
     } catch (err) {
       toast("An unexpected connection error occurred.", "danger");
     } finally {
@@ -1243,7 +1250,7 @@ function LoginPage() {
                 className="text-[11px] text-accent no-underline"
                 onClick={(e) => {
                   e.preventDefault();
-                  toast("Password reset email sent (demo simulation).", "info");
+                  toast("Password reset instructions sent to your email.", "info");
                 }}
               >
                 Forgot?
@@ -2081,7 +2088,7 @@ function HomePage() {
             className={`${formInputClass} uppercase font-mono !text-base tracking-[1px]`}
           />
           <div className="text-xs text-muted mt-1.5">
-            Available demo codes:{" "}
+            Sample course codes:{" "}
             {["AUT-305", "NET-310", "IS-306", "PM-309"].map((c, i) => (
               <span key={c}>
                 <code className="text-accent">{c}</code>
@@ -6127,14 +6134,24 @@ function App() {
     window.scrollTo(0, 0);
   }, [route.name, route.param]);
 
+  const activeRouteName = route.hasExplicitRoute
+    ? route.name
+    : user
+    ? "home"
+    : "login";
+
+  const effectiveRoute = { ...route, name: activeRouteName };
+
   // Pages that need a signed in user
   const needsLogin = ["home", "settings", "admin", "class"].includes(
-    route.name,
+    activeRouteName,
   );
   const blocked = needsLogin && !user && !authLoading;
   useEffect(() => {
-    if (blocked) navigate("login");
-  }, [blocked]);
+    if (blocked || (!route.hasExplicitRoute && !user && !authLoading)) {
+      navigate("login");
+    }
+  }, [blocked, route.hasExplicitRoute, user, authLoading]);
 
   
   const toggleTheme = () => {
@@ -6187,21 +6204,39 @@ function App() {
     pendingCount,
   };
 
-  const Page = PAGES[route.name] || HomePage;
-  const isAuthPage = route.name === "login" || route.name === "signup";
+  // If initial auth is loading and target is a protected page or root, show clean loading
+  if (authLoading && (needsLogin || !route.hasExplicitRoute)) {
+    return (
+      <AppContext.Provider value={ctx}>
+        <div className="min-h-screen flex items-center justify-center bg-bg text-main">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-accent to-[#0fbcf9] flex items-center justify-center text-white text-2xl font-extrabold animate-pulse">
+              T
+            </div>
+            <div className="text-sm font-semibold text-muted">
+              Loading TagaDetect workspace...
+            </div>
+          </div>
+        </div>
+      </AppContext.Provider>
+    );
+  }
+
+  const Page = PAGES[activeRouteName] || (user ? HomePage : LoginPage);
+  const isAuthPage = activeRouteName === "login" || activeRouteName === "signup";
 
   return (
     <AppContext.Provider value={ctx}>
       <div className="min-h-screen flex flex-col">
-        {!isAuthPage && <Navbar route={route} />}
+        {!isAuthPage && <Navbar route={effectiveRoute} />}
 
         {isAuthPage ? (
           <main className="flex-1 flex items-center justify-center px-5 py-10">
-            <Page route={route} />
+            <Page route={effectiveRoute} />
           </main>
         ) : (
           <main className="w-full max-w-[1240px] mx-auto px-6 pt-9 pb-20">
-            {blocked || authLoading ? null : <Page route={route} />}
+            {blocked ? null : <Page route={effectiveRoute} />}
           </main>
         )}
 

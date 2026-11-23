@@ -543,7 +543,7 @@ class TagaStore {
   }
 
   static init() {
-    if (!localStorage.getItem('tagadetect_v3_synced')) {
+    if (!localStorage.getItem('tagadetect_v4_synced')) {
       this.set(STORAGE_KEYS.USERS, INITIAL_USERS);
       this.set(STORAGE_KEYS.CLASSES, INITIAL_CLASSES);
       this.set(STORAGE_KEYS.ACTIVITIES, INITIAL_ACTIVITIES);
@@ -557,8 +557,9 @@ class TagaStore {
         emailAlerts: true,
         autoScanSubmissions: true
       });
-      this.set(STORAGE_KEYS.CURRENT_USER, INITIAL_USERS[0]);
-      localStorage.setItem('tagadetect_v3_synced', 'true');
+      // Do not auto-login; require login first
+      this.set(STORAGE_KEYS.CURRENT_USER, null);
+      localStorage.setItem('tagadetect_v4_synced', 'true');
     }
   }
 

@@ -8,6 +8,34 @@ const TagaNav = {
     return TagaStore.get(STORAGE_KEYS.CURRENT_USER, null);
   },
 
+  requireAuth() {
+    const user = this.getCurrentUser();
+    if (!user) {
+      window.location.replace('login.html');
+      return false;
+    }
+    return true;
+  },
+
+  switchUser(userIdOrUser) {
+    if (!userIdOrUser) {
+      TagaStore.set(STORAGE_KEYS.CURRENT_USER, null);
+      return null;
+    }
+    if (typeof userIdOrUser === 'string') {
+      const users = TagaStore.get(STORAGE_KEYS.USERS, INITIAL_USERS);
+      const user = users.find(u => u.id === userIdOrUser);
+      if (user) {
+        TagaStore.set(STORAGE_KEYS.CURRENT_USER, user);
+        return user;
+      }
+    } else if (typeof userIdOrUser === 'object') {
+      TagaStore.set(STORAGE_KEYS.CURRENT_USER, userIdOrUser);
+      return userIdOrUser;
+    }
+    return null;
+  },
+
   getCurrentTheme() {
     return TagaStore.get(STORAGE_KEYS.THEME, 'dark');
   },
@@ -54,13 +82,13 @@ const TagaNav = {
 
     navContainer.innerHTML = `
       <header class="navbar">
-        <a href="index.html" class="nav-brand">
+        <a href="${isLoggedIn ? 'index.html' : 'login.html'}" class="nav-brand">
           <div class="nav-brand-logo">T</div>
           <div class="nav-brand-name">Taga<span>Detect</span></div>
         </a>
 
         <nav class="nav-links">
-          <a href="index.html" class="nav-item ${activePage === 'home' ? 'active' : ''}">
+          <a href="${isLoggedIn ? 'index.html' : 'login.html'}" class="nav-item ${activePage === 'home' ? 'active' : ''}">
             ${isStudent ? 'Enrolled Classes' : (isProf ? 'Classes Handled' : 'Classes')}
           </a>
           <a href="detector.html" class="nav-item ${activePage === 'detector' ? 'active' : ''}">
