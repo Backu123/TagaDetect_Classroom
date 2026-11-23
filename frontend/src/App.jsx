@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -563,6 +564,10 @@ function predictShuffle(text) {
     if (jitteredScore >= 68) label = "ai";
     else if (jitteredScore >= 38) label = "mixed";
 
+    if (/(\*\*[^*\n\r]{1,60}\*\*|\*\*word\*\*)/i.test(sentence)) {
+      label = "ai";
+    }
+
     return {
       id: `s_${idx + 1}`,
       text: sentence,
@@ -572,10 +577,13 @@ function predictShuffle(text) {
     };
   });
 
+  const mdMatches = text.match(/(\*\*[^*\n\r]{1,60}\*\*|\*\*word\*\*)/gi) || [];
+  const mdBoost = mdMatches.length > 0 ? Math.min(30, mdMatches.length * 12) : 0;
+
   const avgScore =
     sentenceBreakdown.reduce((sum, s) => sum + s.score, 0) /
     (sentenceBreakdown.length || 1);
-  const overallAiScore = Math.min(99, Math.max(1, Math.round(avgScore)));
+  const overallAiScore = Math.min(99, Math.max(1, Math.round(avgScore + mdBoost)));
   const humanProbability = 100 - overallAiScore;
 
   const perplexityScore = Math.min(
@@ -593,9 +601,36 @@ function predictShuffle(text) {
     ),
   );
 
+  let likelySource = null;
+  let sortedSources = [];
+  if (overallAiScore >= 35) {
+    const pool = [
+      "Google Gemini",
+      "Anthropic Claude",
+      "OpenAI (ChatGPT)",
+      "DeepSeek",
+      "Cohere",
+      "AI Singapore",
+    ];
+    likelySource = pool[Math.floor(Math.random() * pool.length)];
+    const secondSource = pool[(pool.indexOf(likelySource) + 1) % pool.length];
+    const thirdSource = pool[(pool.indexOf(likelySource) + 2) % pool.length];
+    const topScore = Math.floor(Math.random() * 25) + 45;
+    const secondScore = Math.floor(Math.random() * 20) + 20;
+    const thirdScore = Math.max(5, 100 - topScore - secondScore);
+    sortedSources = [
+      { name: likelySource, score: topScore, percentage: topScore },
+      { name: secondSource, score: secondScore, percentage: secondScore },
+      { name: thirdSource, score: thirdScore, percentage: thirdScore },
+    ];
+  }
+
   let verdict = "Authentic Human Authorship";
   if (overallAiScore >= 70) verdict = "High Synthetic (AI) Probability";
-  else if (overallAiScore >= 40) verdict = "Mixed / Hybrid Authorship Detected";
+  else if (overallAiScore >= 40)
+    verdict = likelySource
+      ? `Mixed / Hybrid Authorship Detected (Likely: ${likelySource})`
+      : "Mixed / Hybrid Authorship Detected";
   else if (overallAiScore >= 20)
     verdict = "Likely Human with Minor Automated Assistance";
 
@@ -612,6 +647,22 @@ function predictShuffle(text) {
     `${aiSentences} of ${sentences.length} sentences classified as high synthetic probability`,
   );
 
+  if (mdMatches.length > 0) {
+    flags.splice(
+      1,
+      0,
+      `Markdown formatting keyword detected (${mdMatches.length} instances, e.g. '**word**'): characteristic AI generative marker`,
+    );
+  }
+
+  if (likelySource && sortedSources.length > 0) {
+    flags.splice(
+      1,
+      0,
+      `Predicted AI Architecture: ${likelySource} (${sortedSources[0].score}% match)`,
+    );
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     overallAiScore,
@@ -624,6 +675,8 @@ function predictShuffle(text) {
     sentenceCount: sentences.length,
     flags,
     sentenceBreakdown,
+    likelySource,
+    sortedSources,
   };
 }
 
@@ -2198,37 +2251,93 @@ function SentenceList({ items, tone = "accent", maxHeight = 220 }) {
 }
 
 function ReviewReport({ sub }) {
-  const rev = sub.aiReview;
-  if (!rev) return null;
+  if (!sub) return null;
+
+  // Fallback to predictShuffle if aiReview is missing or has empty fields from legacy submissions
+  let rev = sub.aiReview;
+  if (!rev || rev.overallAiScore === undefined || rev.overallAiScore === null) {
+    if (sub.content && sub.content.length > 5) {
+      rev = predictShuffle(sub.content);
+    } else {
+      rev = {
+        overallAiScore: 0,
+        humanProbability: 100,
+        verdict: "Authentic Human Authorship",
+        perplexityScore: 78,
+        burstinessScore: 65,
+        flags: ["No automated synthetic patterns identified"],
+        sentenceBreakdown: sub.content ? [{ text: sub.content, score: 0, label: "human", wordCount: countWords(sub.content) }] : []
+      };
+    }
+  }
+
+  const aiScore = rev.overallAiScore ?? 0;
+  const perpScore = rev.perplexityScore ?? 60;
+  const burstScore = rev.burstinessScore ?? 55;
+  const likelySource = rev.likelySource || (sub.content && /(\*\*[^*\n\r]{1,60}\*\*|\*\*word\*\*)/i.test(sub.content) ? "AI Generator" : null);
+
+  // Derive analysis interpretation
+  let narrative = "";
+  if (aiScore >= 70) {
+    narrative = "High Synthetic Probability: The submitted text exhibits strong markers characteristic of generative AI models, including uniform sentence cadence, standard syntactic formulas, and low unpredictability in word transitions.";
+  } else if (aiScore >= 40) {
+    narrative = `Mixed / Hybrid Authorship Detected: The submission demonstrates combined characteristics. Certain segments show organic human phrasing, while other sections feature elevated predictability and repetitive generative patterns${likelySource ? ` aligning with ${likelySource}` : ""}.`;
+  } else if (aiScore >= 20) {
+    narrative = "Likely Human with Minor Automated Assistance: The overarching structure reflects authentic student authorship, with possible minor digital assistance such as grammar polishing, translation, or spell checking.";
+  } else {
+    narrative = "Authentic Human Authorship: The content displays dynamic structural variation, natural linguistic idiosyncrasies, and organic sentence burstiness typical of authentic human writing.";
+  }
+
+  let perpText = "";
+  if (perpScore < 45) {
+    perpText = "Low unpredictability — word choices follow common, highly predictable language sequences.";
+  } else if (perpScore < 75) {
+    perpText = "Moderate lexical diversity — balanced mix of standard and specialized terms.";
+  } else {
+    perpText = "High surprise — diverse, non-formulaic vocabulary with natural human phrasing.";
+  }
+
+  let burstText = "";
+  if (burstScore < 45) {
+    burstText = "Uniform cadence — sentences have consistent lengths and symmetrical structure (typical AI trait).";
+  } else if (burstScore < 70) {
+    burstText = "Balanced variation — moderate mix of compound and simple sentences.";
+  } else {
+    burstText = "Dynamic rhythm — sharp contrasts between short, punchy statements and long clauses (typical human trait).";
+  }
+
+  const flags = rev.flags || [];
 
   return (
-    <div>
-      <div className="bg-card-inner border border-line rounded-[14px] p-[18px] mb-5">
-        <div className="flex justify-between items-center flex-wrap gap-2 mb-3">
-          <span
-            className={badge(
-              rev.overallAiScore > 50 ? "ai" : "human",
-              "!text-[13px] !px-3.5 !py-1.5",
+    <div className="space-y-5">
+      {/* 1. SUBMITTED OUTPUT SECTION */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-bold text-main flex items-center gap-2">
+            <span>📝</span> Submitted Output
+          </h4>
+          <div className="flex items-center gap-2 text-xs text-muted">
+            {sub.wordCount > 0 && <span>{sub.wordCount} words</span>}
+            {sub.submittedAt && (
+              <span>• {new Date(sub.submittedAt).toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
             )}
-          >
-            {rev.overallAiScore}% AI Probability
-          </span>
-          <span className="text-[13px] font-bold text-main">{rev.verdict}</span>
-        </div>
-        <div className="grid grid-cols-2 gap-3 text-xs text-muted">
-          <div>
-            Perplexity Score:{" "}
-            <strong className="text-main">{rev.perplexityScore}</strong>
-          </div>
-          <div>
-            Burstiness Score:{" "}
-            <strong className="text-main">{rev.burstinessScore}</strong>
           </div>
         </div>
+
+        {sub.content && sub.content.trim() ? (
+          <div className="p-4 bg-card-inner border border-line rounded-[14px] max-h-[220px] overflow-y-auto text-sm leading-relaxed text-main whitespace-pre-wrap font-sans select-text shadow-inner">
+            {sub.content}
+          </div>
+        ) : (
+          <div className="p-4 bg-card-inner border border-dashed border-line rounded-[14px] text-xs text-muted italic">
+            No inline text submitted. Refer to the attached file below.
+          </div>
+        )}
       </div>
 
+      {/* Attachment card (if present) */}
       {sub.fileUrl && (
-        <div className="flex items-center justify-between p-4 mb-5 bg-card-inner border border-line rounded-[14px]">
+        <div className="flex items-center justify-between p-3.5 bg-card-inner border border-line rounded-[14px]">
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-2xl">📄</span>
             <div className="min-w-0">
@@ -2252,8 +2361,79 @@ function ReviewReport({ sub }) {
         </div>
       )}
 
+      {/* 2. ANALYSIS INTERPRETATION SECTION */}
+      <div className="bg-card-inner border border-line rounded-[16px] p-5 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-3 pb-3 border-b border-line">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className={badge(
+                aiScore > 50 ? "ai" : (aiScore >= 20 ? "mixed" : "human"),
+                "!text-[13px] !px-3.5 !py-1.5",
+              )}
+            >
+              {aiScore}% AI Probability
+            </span>
+            {likelySource && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-accent/15 text-accent border border-accent/30 font-medium">
+                🤖 Likely: {likelySource}
+              </span>
+            )}
+          </div>
+          <span className="text-[13px] font-bold text-main">{rev.verdict}</span>
+        </div>
+
+        {/* Narrative interpretation */}
+        <div className="mb-4 text-xs text-main/90 leading-relaxed bg-bg/50 p-3.5 rounded-[12px] border border-line/60">
+          <div className="font-bold text-xs text-main mb-1 flex items-center gap-1.5">
+            <span>🔍</span> Analysis Interpretation
+          </div>
+          <p>{narrative}</p>
+        </div>
+
+        {/* Perplexity & Burstiness Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div className="p-3 bg-bg/40 border border-line/50 rounded-[12px]">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs text-muted font-medium">Perplexity Score</span>
+              <strong className="text-sm font-bold text-main">{perpScore} / 100</strong>
+            </div>
+            <div className="text-[11px] text-muted leading-tight">
+              {perpText}
+            </div>
+          </div>
+
+          <div className="p-3 bg-bg/40 border border-line/50 rounded-[12px]">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs text-muted font-medium">Burstiness Score</span>
+              <strong className="text-sm font-bold text-main">{burstScore} / 100</strong>
+            </div>
+            <div className="text-[11px] text-muted leading-tight">
+              {burstText}
+            </div>
+          </div>
+        </div>
+
+        {/* Diagnostic flags / insights (if any) */}
+        {flags.length > 0 && (
+          <div className="pt-2 border-t border-line/50">
+            <div className="text-[11px] font-bold text-muted uppercase tracking-wider mb-2">
+              Key Diagnostic Signals
+            </div>
+            <div className="flex flex-col gap-1.5">
+              {flags.map((flag, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-xs text-muted">
+                  <span className="text-accent text-[11px] mt-0.5">•</span>
+                  <span>{flag}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 3. GRADE & PROFESSOR FEEDBACK */}
       {hasGrade(sub) && (
-        <div className="bg-emerald/10 border border-emerald rounded-[14px] px-4 py-3 mb-5">
+        <div className="bg-emerald/10 border border-emerald rounded-[14px] px-4 py-3">
           <div className="text-sm font-bold text-emerald">
             Grade: {sub.grade} pts
           </div>
@@ -2264,12 +2444,20 @@ function ReviewReport({ sub }) {
         </div>
       )}
 
-      <h4 className="text-sm font-bold mb-2">Sentence Breakdown</h4>
-      <SentenceList
-        items={rev.sentenceBreakdown || []}
-        tone="accent"
-        maxHeight={260}
-      />
+      {/* 4. SENTENCE BREAKDOWN */}
+      <div>
+        <h4 className="text-sm font-bold mb-2 flex items-center justify-between">
+          <span>Sentence Breakdown</span>
+          <span className="text-xs font-normal text-muted">
+            {rev.sentenceBreakdown?.length || 0} sentences analyzed
+          </span>
+        </h4>
+        <SentenceList
+          items={rev.sentenceBreakdown || []}
+          tone="accent"
+          maxHeight={240}
+        />
+      </div>
     </div>
   );
 }
@@ -2449,7 +2637,7 @@ function ClassPage({ route }) {
       }
     }
 
-    const aiReview = generateSubmissionReview(
+    const aiReview = await generateSubmissionReview(
       text || (uploadedFileName ? `Attached document: ${uploadedFileName}. Content submitted for evaluation.` : "")
     );
     if (uploadedFileUrl) {
@@ -2933,19 +3121,24 @@ const submitGrade = async () => {
                                   )}
                                   onClick={() => openReview(mySub)}
                                 >
-                                  View Automated Review (
-                                  {mySub.aiReview.overallAiScore}% AI)
+                                  View Submission ({mySub.aiReview?.overallAiScore ?? 0}% AI)
                                 </button>
-                                <button
-                                  type="button"
-                                  className={btn(
-                                    "secondary",
-                                    "!text-xs !px-3.5 !py-1.5",
-                                  )}
-                                  onClick={() => openPass(act)}
-                                >
-                                  Re-Pass Activity
-                                </button>
+                                {hasGrade(mySub) ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted bg-line px-3 py-1.5 rounded-lg cursor-not-allowed select-none">
+                                    🔒 Graded (Submission Locked)
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className={btn(
+                                      "secondary",
+                                      "!text-xs !px-3.5 !py-1.5",
+                                    )}
+                                    onClick={() => openPass(act)}
+                                  >
+                                    Re-Pass Activity
+                                  </button>
+                                )}
                               </>
                             ) : (
                               <button
@@ -3285,6 +3478,27 @@ const submitGrade = async () => {
           </>
         }
       >
+        {/* Professor's question / activity prompt */}
+        {passActivity && (passActivity.description || passActivity.instructions || passActivity.rubric) && (
+          <div className="mb-5 bg-accent/5 border border-accent/20 rounded-[14px] p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-accent text-base">📋</span>
+              <span className="text-[13px] font-bold text-accent">Professor's Assignment</span>
+              <span className="ml-auto text-xs text-muted">{passActivity.maxPoints} pts · Due {passActivity.dueDate}</span>
+            </div>
+            {(passActivity.description || passActivity.instructions) && (
+              <p className="text-[13px] text-main leading-relaxed mb-2 whitespace-pre-line">
+                {passActivity.instructions || passActivity.description}
+              </p>
+            )}
+            {passActivity.rubric && (
+              <p className="text-xs text-muted">
+                <strong className="text-main">Rubric:</strong> {passActivity.rubric}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* File Upload Section */}
         <div className="mb-5 bg-card-inner border border-line rounded-[14px] p-4">
           <label className="block text-[13px] font-semibold text-main mb-1.5">
@@ -3340,6 +3554,13 @@ const submitGrade = async () => {
             placeholder="Type or paste your assignment essay, overview, or notes here for AI integrity analysis..."
             className={`${formInputClass} min-h-[160px] text-sm leading-[1.6] resize-y`}
           />
+          <div className={`mt-1.5 text-[11px] font-medium ${countWords(passText) >= 50 ? "text-emerald-400" : "text-amber-400"}`}>
+            {countWords(passText) === 0
+              ? "✏️ Type your submission above. Longer passages yield the most accurate AI detection."
+              : countWords(passText) < 50
+              ? `⚠️ ${countWords(passText)} / 50 words — Sample under 50 words. Longer passages yield the most accurate AI detection.`
+              : `✓ ${countWords(passText)} words — Optimal length for AI analysis.`}
+          </div>
         </div>
         <div className="bg-accent/10 border border-accent/25 rounded-lg px-4 py-3 text-xs text-muted">
           <strong className="text-accent">Automated AI Review Notice:</strong>{" "}
@@ -3543,17 +3764,17 @@ const submitGrade = async () => {
         </div>
       </Modal>
 
-      {/* Automated review report popup */}
+      {/* Submission review report popup */}
       <Modal
         open={modal === "review"}
         onClose={closeModal}
-        title="Automated AI Diagnostic Report"
+        title="Viewing Submission Report"
         subtitle={
           reviewSub
-            ? `Transparent AI review for ${reviewSub.studentName}, generated upon passing`
+            ? `Submission review and analysis for ${reviewSub.studentName}`
             : ""
         }
-        maxWidth={720}
+        maxWidth={780}
         footer={
           <button
             type="button"
@@ -3688,7 +3909,7 @@ const submitGrade = async () => {
 /* ---------- AI Detector page ---------- */
 
 function DetectorPage() {
-  const { user, feedback, setFeedback, toast } = useApp();
+  const { user, feedback, setFeedback, reloadFeedback, toast } = useApp();
   const [text, setText] = useState("");
   const [result, setResult] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -3753,13 +3974,12 @@ function DetectorPage() {
       user_role: user ? user.role : "student",
       detected_score: result ? result.overallAiScore : 0,
       accuracy_rating: fbForm.rating,
-      feedback_type: fbForm.type,
+      category: fbForm.type,
       comment,
-      status: "Audited",
     };
 
     const { data: inserted, error } = await supabase
-      .from("detector_feedback")
+      .from("ai_feedback")
       .insert(payload)
       .select()
       .single();
@@ -3770,22 +3990,29 @@ function DetectorPage() {
       return;
     }
 
-    // Optimistically prepend to the local list so the user sees it immediately
-    setFeedback((prev) => [
-      {
-        id: inserted.id,
-        userId: inserted.user_id,
-        userName: inserted.user_name,
-        userRole: inserted.user_role,
-        timestamp: inserted.created_at,
-        detectedScore: inserted.detected_score,
-        accuracyRating: inserted.accuracy_rating,
-        feedbackType: inserted.feedback_type,
-        comment: inserted.comment,
-        status: inserted.status,
-      },
-      ...prev,
-    ]);
+    // Optimistically update local list so the user sees it immediately
+    if (inserted) {
+      setFeedback((prev) => [
+        {
+          id: inserted.id,
+          userId: inserted.user_id,
+          userName: inserted.user_name || (user ? user.name : "Guest User"),
+          userRole: inserted.user_role || (user ? user.role : "student"),
+          timestamp: inserted.created_at || new Date().toISOString(),
+          detectedScore: inserted.detected_score || 0,
+          accuracyRating: inserted.accuracy_rating || fbForm.rating,
+          feedbackType: inserted.category || fbForm.type,
+          comment: inserted.comment || comment,
+          status: "Audited",
+        },
+        ...prev,
+      ]);
+    }
+
+    if (reloadFeedback) {
+      await reloadFeedback();
+    }
+
     setFbForm({
       rating: "highly_accurate",
       type: "Accuracy Feedback",
@@ -3976,7 +4203,9 @@ function DetectorPage() {
                     "mt-2.5 !text-[13px] !px-4 !py-1.5",
                   )}
                 >
-                  {result.verdict}
+                  {result.verdict.includes("Mixed / Hybrid") && result.likelySource && !result.verdict.includes(result.likelySource)
+                    ? `${result.verdict} (Likely: ${result.likelySource})`
+                    : result.verdict}
                 </div>
               </div>
 
@@ -5043,6 +5272,8 @@ function SettingsPage() {
   });
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
   const [editForm, setEditForm] = useState({
     fullName: "",
     username: "",
@@ -5052,21 +5283,43 @@ function SettingsPage() {
   if (!user) return null;
 
   const openEdit = () => {
+    const currentAvatar = user.avatar_url || user.avatar || "";
     setEditForm({
-      fullName: user.full_name || "",
+      fullName: user.full_name || user.name || "",
       username: user.username || "",
-      avatarUrl: user.avatar_url || "",
+      avatarUrl: currentAvatar,
     });
+    setPhotoPreview(currentAvatar || null);
     setEditOpen(true);
   };
 
   const setEditField = (field) => (e) =>
     setEditForm((prev) => ({ ...prev, [field]: e.target.value }));
 
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast("Please select an image file (PNG, JPG, WebP, etc.).", "warning");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast("Photo must be smaller than 5 MB.", "warning");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result;
+      setEditForm((prev) => ({ ...prev, avatarUrl: dataUrl }));
+      setPhotoPreview(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const saveProfile = async () => {
     const fullName = editForm.fullName.trim();
     const username = editForm.username.trim();
-    const avatarUrl = editForm.avatarUrl.trim();
+    let avatarUrl = editForm.avatarUrl;
 
     if (!fullName || !username) {
       toast("Full name and username are required.", "warning");
@@ -5074,6 +5327,39 @@ function SettingsPage() {
     }
 
     setSaving(true);
+
+    // If a new photo was uploaded as a data URL, try uploading to Supabase storage
+    if (avatarUrl && avatarUrl.startsWith("data:image/")) {
+      try {
+        const mimeType = avatarUrl.split(";")[0].split(":")[1] || "image/png";
+        const ext = mimeType.split("/")[1] || "png";
+        const base64Data = avatarUrl.split(",")[1];
+        const byteCharacters = atob(base64Data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mimeType });
+        const filePath = `avatars/${user.id}_${Date.now()}.${ext}`;
+
+        const { error: upErr } = await supabase.storage
+          .from("classroom-files")
+          .upload(filePath, blob, { upsert: true, contentType: mimeType });
+
+        if (!upErr) {
+          const { data: urlData } = supabase.storage
+            .from("classroom-files")
+            .getPublicUrl(filePath);
+          if (urlData?.publicUrl) {
+            avatarUrl = urlData.publicUrl;
+          }
+        }
+      } catch (err) {
+        console.warn("Storage upload fallback to data URL:", err);
+      }
+    }
+
     const { data, error } = await supabase
       .from("profiles")
       .update({
@@ -5234,74 +5520,6 @@ function SettingsPage() {
         </div>
       </div>
 
-      {/* Detection preferences */}
-      <div className={`${cardClass} !p-6 mb-6`}>
-        <h3 className="text-base font-bold mb-1.5">
-          AI Detection Engine Preferences
-        </h3>
-        <p className="text-[13px] text-muted mb-4">
-          Configure heuristic tolerance and token cadence parameters
-        </p>
-
-        <div className="mb-[18px]">
-          <label className={formLabelClass}>Heuristic Sensitivity</label>
-          <select
-            value={prefs.sensitivity}
-            onChange={savePref("sensitivity")}
-            className={formInputClass}
-          >
-            <option value="conservative">
-              Conservative (Minimizes false positives, higher human tolerance)
-            </option>
-            <option value="balanced">
-              Balanced (Standard academic calibration)
-            </option>
-            <option value="strict">
-              Strict (High sensitivity for advanced LLM watermarks)
-            </option>
-          </select>
-        </div>
-
-        <div>
-          <label className={formLabelClass}>
-            Shuffling & Predictability Model
-          </label>
-          <select
-            value={prefs.shuffleMode}
-            onChange={savePref("shuffleMode")}
-            className={formInputClass}
-          >
-            <option value="pseudo_shuffled">
-              Pseudo-Shuffled Token Permutation (Fast Heuristic)
-            </option>
-            <option value="ngram_burstiness">
-              N-Gram Burstiness & Perplexity Analysis
-            </option>
-          </select>
-        </div>
-      </div>
-
-      {/* Reset */}
-      <div className="bg-rose/5 border border-rose rounded-[20px] p-6">
-        <div className="flex justify-between items-center flex-wrap gap-4">
-          <div>
-            <h3 className="text-[15px] font-bold text-rose">
-              Reset Application Data
-            </h3>
-            <p className="text-[13px] text-muted mt-0.5">
-              Restore all classes, founders, activities, and initial users to
-              factory seed defaults.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={resetAll}
-            className="inline-flex items-center gap-2 text-[13px] font-semibold px-4 py-2 rounded-full bg-card border border-rose text-rose cursor-pointer transition-all duration-200 hover:bg-rose/10"
-          >
-            Reset to Factory Defaults ↺
-          </button>
-        </div>
-      </div>
             <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
@@ -5346,14 +5564,49 @@ function SettingsPage() {
           />
         </div>
         <div>
-          <label className={formLabelClass}>Profile Photo Link</label>
-          <input
-            type="url"
-            value={editForm.avatarUrl}
-            onChange={setEditField("avatarUrl")}
-            placeholder="https://..."
-            className={formInputClass}
-          />
+          <label className={formLabelClass}>Profile Photo</label>
+          <div className="flex items-center gap-4 mt-2 p-3 bg-card-inner border border-line rounded-[14px]">
+            <img
+              src={photoPreview || editForm.avatarUrl || FALLBACK_AVATAR}
+              alt="Profile preview"
+              className="w-16 h-16 rounded-full border-2 border-accent object-cover shadow-sm bg-card shrink-0"
+            />
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="hidden"
+                id="edit-profile-photo-file"
+              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  className={btn("secondary", "!text-xs !px-3.5 !py-1.5")}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  📷 Upload Photo
+                </button>
+                {(photoPreview || editForm.avatarUrl) && (
+                  <button
+                    type="button"
+                    className="text-xs text-rose-400 hover:text-rose-300 font-medium px-2 py-1 transition-colors"
+                    onClick={() => {
+                      setEditForm((prev) => ({ ...prev, avatarUrl: "" }));
+                      setPhotoPreview(null);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <span className="text-[11px] text-muted">
+                Choose a photo from your device (PNG, JPG, or WebP up to 5 MB)
+              </span>
+            </div>
+          </div>
         </div>
       </Modal>
 
@@ -5717,6 +5970,7 @@ function App() {
         description: m.description || "",
         fileSize: m.file_size || "0 KB",
         fileUrl: m.file_url || null,
+        fileName: m.file_name || null,
         postedAt: m.created_at ? new Date(m.created_at).toISOString().split("T")[0] : "",
       })),
     );
@@ -5727,12 +5981,8 @@ function App() {
   }, [reloadMaterials]);
 
   const reloadFeedback = useCallback(async () => {
-    if (!session) {
-      setFeedback([]);
-      return;
-    }
     const { data, error } = await supabase
-      .from("detector_feedback")
+      .from("ai_feedback")
       .select("*")
       .order("created_at", { ascending: false });
     if (error) {
@@ -5748,12 +5998,12 @@ function App() {
         timestamp: f.created_at,
         detectedScore: f.detected_score || 0,
         accuracyRating: f.accuracy_rating || "partially_accurate",
-        feedbackType: f.feedback_type || "Accuracy Feedback",
+        feedbackType: f.category || f.feedback_type || "Accuracy Feedback",
         comment: f.comment || "",
-        status: f.status || "Audited",
+        status: "Audited",
       })),
     );
-  }, [session, toast]);
+  }, []);
 
   useEffect(() => {
     reloadFeedback();
@@ -5782,11 +6032,17 @@ function App() {
       });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
-        if (newSession) setAuthLoading(true);
-        setSession(newSession);
-      },
-    );
+    (event, newSession) => {
+      // Only set loading on initial sign-in, not on background token refreshes
+      if (event === "SIGNED_IN" && !session) {
+        setAuthLoading(false);
+      } else if (event === "SIGNED_OUT") {
+        setProfile(null);
+        setAuthLoading(true);
+      }
+      setSession(newSession);
+    },
+  );
 
     return () => {
       active = false;

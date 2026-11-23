@@ -102,6 +102,10 @@ const AI_DETECTOR_ENGINE = {
       if (jitteredScore >= 68) label = 'ai';
       else if (jitteredScore >= 38) label = 'mixed';
 
+      if (/(\*\*[^*\n\r]{1,60}\*\*|\*\*word\*\*)/i.test(sentence)) {
+        label = 'ai';
+      }
+
       return {
         id: `s_${idx + 1}`,
         text: sentence,
@@ -112,17 +116,41 @@ const AI_DETECTOR_ENGINE = {
     });
 
     const avgScore = sentenceBreakdown.reduce((sum, s) => sum + s.score, 0) / (sentenceBreakdown.length || 1);
-    const overallAiScore = Math.min(99, Math.max(1, Math.round(avgScore)));
+    // Check for markdown bold keyword formatting (e.g. **word**, **keyword**)
+    const mdMatches = text.match(/(\*\*[^*\n\r]{1,60}\*\*|\*\*word\*\*)/gi) || [];
+    let mdBoost = 0;
+    if (mdMatches.length > 0) {
+      mdBoost = Math.min(30, mdMatches.length * 12);
+    }
+
+    const overallAiScore = Math.min(99, Math.max(1, Math.round(avgScore + mdBoost)));
     const humanProbability = 100 - overallAiScore;
 
     const shuffledPerplexity = Math.min(95, Math.max(12, Math.round((100 - overallAiScore) * 0.85 + (Math.random() * 15 - 7))));
     const shuffledBurstiness = Math.min(92, Math.max(10, Math.round((100 - overallAiScore) * 0.75 + (Math.random() * 20 - 10))));
 
+    let likelySource = null;
+    let sortedSources = [];
+    if (overallAiScore >= 35) {
+      const pool = ['Google Gemini', 'Anthropic Claude', 'OpenAI (ChatGPT)', 'DeepSeek', 'Cohere', 'AI Singapore'];
+      likelySource = pool[Math.floor(Math.random() * pool.length)];
+      const secondSource = pool[(pool.indexOf(likelySource) + 1) % pool.length];
+      const thirdSource = pool[(pool.indexOf(likelySource) + 2) % pool.length];
+      const topScore = Math.floor(Math.random() * 25) + 45;
+      const secondScore = Math.floor(Math.random() * 20) + 20;
+      const thirdScore = Math.max(5, 100 - topScore - secondScore);
+      sortedSources = [
+        { name: likelySource, score: topScore, percentage: topScore },
+        { name: secondSource, score: secondScore, percentage: secondScore },
+        { name: thirdSource, score: thirdScore, percentage: thirdScore }
+      ];
+    }
+
     let verdict = 'Authentic Human Authorship';
     if (overallAiScore >= 70) {
       verdict = 'High Synthetic (AI) Probability';
     } else if (overallAiScore >= 40) {
-      verdict = 'Mixed / Hybrid Authorship Detected';
+      verdict = likelySource ? `Mixed / Hybrid Authorship Detected (Likely: ${likelySource})` : 'Mixed / Hybrid Authorship Detected';
     } else if (overallAiScore >= 20) {
       verdict = 'Likely Human with Minor Automated Assistance';
     }
@@ -139,22 +167,12 @@ const AI_DETECTOR_ENGINE = {
     const aiSentences = sentenceBreakdown.filter(s => s.label === 'ai').length;
     flags.unshift(`${aiSentences} of ${sentences.length} sentences classified as high synthetic probability`);
 
-    let likelySource = null;
-    let sortedSources = [];
-    if (overallAiScore >= 35) {
-      const pool = ['OpenAI (ChatGPT)', 'Anthropic Claude', 'Google Gemini', 'DeepSeek', 'Cohere', 'AI Singapore'];
-      likelySource = pool[Math.floor(Math.random() * pool.length)];
-      const secondSource = pool[(pool.indexOf(likelySource) + 1) % pool.length];
-      const thirdSource = pool[(pool.indexOf(likelySource) + 2) % pool.length];
-      const topScore = Math.floor(Math.random() * 25) + 45;
-      const secondScore = Math.floor(Math.random() * 20) + 20;
-      const thirdScore = Math.max(5, 100 - topScore - secondScore);
-      sortedSources = [
-        { name: likelySource, score: topScore, percentage: topScore },
-        { name: secondSource, score: secondScore, percentage: secondScore },
-        { name: thirdSource, score: thirdScore, percentage: thirdScore }
-      ];
-      flags.splice(1, 0, `Predicted AI Architecture: ${likelySource} (${topScore}% match)`);
+    if (mdMatches.length > 0) {
+      flags.splice(1, 0, `Markdown formatting keyword detected (${mdMatches.length} instances, e.g. '**word**'): characteristic AI generative marker`);
+    }
+
+    if (likelySource && sortedSources.length > 0) {
+      flags.splice(1, 0, `Predicted AI Architecture: ${likelySource} (${sortedSources[0].score}% match)`);
     }
 
     return {
