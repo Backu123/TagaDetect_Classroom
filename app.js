@@ -981,7 +981,11 @@ class TagaApp {
       }
 
       if (verdictBadge) {
-        verdictBadge.textContent = result.verdict;
+        let displayVerdict = result.verdict;
+        if (displayVerdict.includes('Mixed / Hybrid') && result.likelySource && !displayVerdict.includes(result.likelySource)) {
+          displayVerdict = `${displayVerdict} (Likely: ${result.likelySource})`;
+        }
+        verdictBadge.textContent = displayVerdict;
         verdictBadge.className = 'badge ' + (score >= 70 ? 'badge-ai' : (score >= 40 ? 'badge-mixed' : 'badge-human'));
       }
 
@@ -1332,10 +1336,21 @@ class TagaApp {
         <div class="card" style="margin-bottom: 24px;">
           <h3 class="card-title" style="margin-bottom: 18px;">Profile Information</h3>
           <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 24px;">
-            <img src="${user.avatar}" style="width: 68px; height: 68px; border-radius: 50%; border: 3px solid var(--accent-purple);" />
+            <div style="position: relative;">
+              <img id="settings-avatar-img" src="${user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}" style="width: 72px; height: 72px; border-radius: 50%; border: 3px solid var(--accent-purple); object-fit: cover;" />
+            </div>
             <div>
               <strong style="font-size: 17px;">${user.name}</strong>
-              <div style="font-size: 13px; color: var(--text-muted);">Role: ${user.role.toUpperCase()} (${user.status})</div>
+              <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 6px;">Role: ${user.role.toUpperCase()} (${user.status})</div>
+              <input type="file" id="settings-photo-file-input" accept="image/*" style="display: none;" onchange="window.tagaApp.handlePhotoUpload(event)" />
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;" onclick="document.getElementById('settings-photo-file-input').click()">
+                  📷 Upload Photo
+                </button>
+                <button type="button" style="background: none; border: none; color: var(--accent-rose); font-size: 11px; cursor: pointer;" onclick="window.tagaApp.removePhoto()">
+                  Remove
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1380,6 +1395,35 @@ class TagaApp {
     `;
   }
 
+  handlePhotoUpload(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      this.showToast('Please select an image file (PNG, JPG, or WebP).', 'warning');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.showToast('Photo must be smaller than 5 MB.', 'warning');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      this.tempUploadedAvatar = ev.target.result;
+      const avatarImg = document.getElementById('settings-avatar-img');
+      if (avatarImg) avatarImg.src = this.tempUploadedAvatar;
+      this.showToast('Photo selected! Click Save Changes to apply.', 'info');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  removePhoto() {
+    this.tempUploadedAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150';
+    const avatarImg = document.getElementById('settings-avatar-img');
+    if (avatarImg) avatarImg.src = this.tempUploadedAvatar;
+    const fileInput = document.getElementById('settings-photo-file-input');
+    if (fileInput) fileInput.value = '';
+  }
+
   saveProfile() {
     const name = document.getElementById('settings-name').value;
     const username = document.getElementById('settings-username').value;
@@ -1391,6 +1435,10 @@ class TagaApp {
       this.currentUser.username = username;
       this.currentUser.email = email;
       this.currentUser.department = dept;
+      if (this.tempUploadedAvatar) {
+        this.currentUser.avatar = this.tempUploadedAvatar;
+        this.tempUploadedAvatar = null;
+      }
 
       const users = TagaStore.get(STORAGE_KEYS.USERS, []);
       const idx = users.findIndex(u => u.id === this.currentUser.id);
@@ -1400,7 +1448,7 @@ class TagaApp {
       }
       TagaStore.set(STORAGE_KEYS.CURRENT_USER, this.currentUser);
       this.renderHeaderUser();
-      this.showToast('Profile updated!');
+      this.showToast('Profile and photo updated!');
     }
   }
 

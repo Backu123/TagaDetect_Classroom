@@ -12,6 +12,109 @@ import joblib
 
 from taga_features import normalize_text, style_features
 
+# ---------------------------------------------------------------------------
+# AI transition/cliché marker patterns
+# High density of these phrases is a strong AI signal in both English & Tagalog
+# ---------------------------------------------------------------------------
+_AI_MARKER_PATTERNS_EN = re.compile(
+    r"\b(in conclusion|furthermore|moreover|additionally|it is essential to|"
+    r"it is important to note|it is worth noting|by leveraging|in the context of|"
+    r"in today's (rapidly )?(changing |evolving |digital )?world|"
+    r"plays? a (pivotal|crucial|vital|key) role|"
+    r"rapidly evolving|at the forefront|delve into|"
+    r"navigating|underscore|innovative solutions?|"
+    r"comprehensive (understanding|approach|overview|analysis)|"
+    r"highlights? the importance of|"
+    r"in summary|to summarize|as (mentioned|stated|noted) (above|earlier|previously)|"
+    r"a wide (range|variety|array) of|"
+    r"with the (advent|rise|emergence) of|"
+    r"in recent years|on the other hand|in light of|"
+    r"to (achieve|ensure|address|tackle|foster|facilitate|promote|enhance|leverage|mitigate)|"
+    r"first and foremost|last but not least|in essence|as a result)",
+    re.IGNORECASE,
+)
+
+_AI_MARKER_PATTERNS_TL = re.compile(
+    r"\b(sa makabagong panahon|bilang pagtatapos|sa kabuuan|"
+    r"mahalaga(ng)? (banggitin|tandaan|pansinin)|"
+    r"isa sa (mga )?mahalagang|"
+    r"sa (ating|ating) (lipunan|bansa|mundo|panahon)|"
+    r"ang (teknolohiya|modernong)|"
+    r"sa (pamamagitan|tulong) ng|"
+    r"may malaking (papel|epekto|impluwensya|kaugnayan)|"
+    r"malawak na (pag-unawa|kaalaman|epekto)|"
+    r"bukod dito|bukod pa rito|bukod pa dito|"
+    r"gayunpaman|gayunman|sa kabilang banda|"
+    r"upang (matiyak|maitaguyod|matugunan|makamit)|"
+    r"nararapat (lamang|na)|una sa lahat|huli ngunit hindi kakaunti)",
+    re.IGNORECASE,
+)
+
+# Markdown bold keyword syntax (e.g. **word**, **keyword**, **summary:**)
+# This is a distinctive signature of raw AI/LLM outputs copied directly into text.
+_AI_MARKER_PATTERNS_MD = re.compile(
+    r"(\*\*[^*\n\r]{1,60}\*\*|\*\*word\*\*)",
+    re.IGNORECASE,
+)
+
+
+def _ai_marker_density(text: str) -> float:
+    """Return ratio of AI-cliché and markdown-bold keyword matches per 100 words."""
+    words = text.split()
+    n = max(len(words), 1)
+    hits_en = len(_AI_MARKER_PATTERNS_EN.findall(text))
+    hits_tl = len(_AI_MARKER_PATTERNS_TL.findall(text))
+    hits_md = len(_AI_MARKER_PATTERNS_MD.findall(text))
+    return (hits_en + hits_tl + hits_md * 2.0) / (n / 100.0)
+
+
+def _sentence_cv(sentences) -> float:
+    """Coefficient of Variation of sentence word-lengths.
+    AI text: low CV (< 0.35, uniform), human text: high CV (> 0.50, varied).
+    """
+    lens = [len(s.split()) for s in sentences if s.strip()]
+    if len(lens) < 2:
+        return 0.5  # neutral
+    m = float(np.mean(lens))
+    if m == 0:
+        return 0.5
+    return float(np.std(lens) / m)
+
+
+def _heuristic_ai_boost(text: str, sentences, base_prob: float) -> float:
+    """Blend base ML probability with AI-marker density and sentence CV signals.
+
+    - marker_density > 1.5 per 100 words  → strong AI signal
+    - sentence_cv < 0.30                   → AI (uniform cadence)
+    - sentence_cv > 0.55                   → human (varied cadence)
+    Returns adjusted probability in [0, 1].
+    """
+    density = _ai_marker_density(text)
+    cv = _sentence_cv(sentences)
+    md_hits = len(_AI_MARKER_PATTERNS_MD.findall(text))
+
+    # Marker signal: scale 0-10 density → 0.0-1.0 AI probability
+    marker_signal = float(np.clip(density / 10.0, 0.0, 1.0))
+
+    # CV signal: low CV → AI (high p), high CV → human (low p)
+    # CV=0.0 → 1.0 AI;  CV=1.0 → 0.0 AI;  CV=0.5 → 0.5 neutral
+    cv_signal = float(np.clip(1.0 - cv * 1.5, 0.0, 1.0))
+
+    # Blend weights: ML=55%, marker=30%, cadence=15%
+    n_words = len(text.split())
+    if n_words < 50:
+        # Too short for heuristics to be reliable — keep mostly ML score
+        combined = base_prob * 0.80 + marker_signal * 0.15 + cv_signal * 0.05
+    else:
+        combined = base_prob * 0.55 + marker_signal * 0.30 + cv_signal * 0.15
+
+    # Markdown formatting (e.g. **word**) is an explicit hallmark of raw AI/LLM outputs
+    if md_hits > 0:
+        boost = min(0.35, md_hits * 0.12)
+        combined = min(1.0, combined + boost)
+
+    return float(np.clip(combined, 0.0, 1.0))
+
 
 def _logit(p):
     p = min(max(p, 1e-6), 1 - 1e-6)
@@ -62,8 +165,23 @@ class TagaDetector:
         return out
 
     def _ensemble(self, task, clean):
-        weights = self.cfg[task]["weights"]
+        weights = dict(self.cfg[task]["weights"])
         probs = self._model_probs(task, clean)
+
+        # When XLM-R transformer is not loaded (e.g. running on scikit-learn/LightGBM),
+        # ensure lgbm_style is not zero-weighted. lgbm_style is language-agnostic and
+        # critical for detecting AI writing in English and Taglish prose.
+        if "xlmr" not in probs:
+            if task == "label":
+                style_feat = self._style(clean)[0]
+                tl_share = style_feat[12] if len(style_feat) > 12 else 0.0
+                if tl_share > 0.04:
+                    weights = {"tfidf_lr": 0.60, "lgbm_style": 0.40}
+                else:
+                    weights = {"tfidf_lr": 0.20, "lgbm_style": 0.80}
+            elif task == "source":
+                weights = {"tfidf_lr": 0.50, "lgbm_style": 0.50}
+
         active_weights = {name: weights[name] for name in probs if weights.get(name, 0) > 0}
         total = sum(active_weights.values())
         if total > 0:
@@ -89,8 +207,13 @@ class TagaDetector:
         raw_ai = float(mixed[1])
         platt = label_cfg["platt"]
         z = platt["coef"] * _logit(raw_ai) + platt["intercept"]
-        ai_probability = float(1.0 / (1.0 + np.exp(-z)))
+        ml_probability = float(1.0 / (1.0 + np.exp(-z)))
 
+        # --- Tier 2/3/4: Blend ML score with AI-marker & sentence-cadence signals ---
+        sentences = self.split_sentences(text)
+        ai_probability = _heuristic_ai_boost(text, sentences, ml_probability)
+
+        # Recompute band with boosted score
         t_human = label_cfg["thresholds"]["likely_human_below"]
         t_ai = label_cfg["thresholds"]["likely_ai_at_or_above"]
         if ai_probability >= t_ai:
@@ -102,19 +225,21 @@ class TagaDetector:
 
         result = {
             "ai_probability": round(ai_probability, 4),
+            "ml_probability": round(ml_probability, 4),
             "band": band,
             "thresholds": {"likely_human_below": round(t_human, 4), "likely_ai_at_or_above": round(t_ai, 4)},
             "word_count": n_words,
             "too_short": n_words < self.cfg["min_words_reliable"],
             "model_scores": {k: round(float(v[1]), 4) for k, v in per_model.items()},
+            "ai_marker_density": round(_ai_marker_density(text), 3),
+            "sentence_cv": round(_sentence_cv(sentences), 3),
             "likely_source": None,
             "source_probabilities": None,
         }
 
-        # Stage 2: Source classifier — only runs when Stage 1 detects AI content.
-        # If the text is classified as human (ai_probability < 35%), skip source
-        # attribution entirely — there is no meaningful generator to attribute.
-        if ai_probability >= 0.35:
+        # Stage 2: Source classifier — runs when Stage 1 detects AI content (score >= 35% or band is not likely_human).
+        # If the text is classified as human, skip source attribution entirely.
+        if band != "likely_human" or ai_probability >= 0.35:
             source_mix, _ = self._ensemble("source", clean)
             classes = self.cfg["source"]["classes"]
             probs_dict = {c: round(float(p), 4) for c, p in zip(classes, source_mix)}
@@ -181,6 +306,11 @@ class TagaDetector:
             else:
                 label = "human"
 
+            # If the sentence contains markdown bold keywords (e.g. **word**), flag as AI
+            if _AI_MARKER_PATTERNS_MD.search(sentence):
+                s_score = max(s_score, 80)
+                label = "ai"
+
             sentence_breakdown.append({
                 "id": f"s_{idx + 1}",
                 "text": sentence,
@@ -206,17 +336,7 @@ class TagaDetector:
         else:
             perplexity = 50
 
-        # Determine verdict
-        if overall_score >= 70:
-            verdict = "High Synthetic (AI) Probability"
-        elif overall_score >= 40:
-            verdict = "Mixed / Hybrid Authorship Detected"
-        elif overall_score >= 20:
-            verdict = "Likely Human with Minor Automated Assistance"
-        else:
-            verdict = "Authentic Human Authorship"
-
-        # Stage 2 results — only populated when Stage 1 detected AI (score >= 35%).
+        # Stage 2 results — populated when Stage 1 detected AI (score >= 35%).
         # For human text, base_res["likely_source"] is None, so these stay empty.
         likely_source = base_res.get("likely_source")        # None for human text
         source_probs = base_res.get("source_probabilities")  # None for human text
@@ -228,9 +348,29 @@ class TagaDetector:
                 reverse=True
             )
 
+        if not likely_source and sorted_sources and overall_score >= 35:
+            likely_source = sorted_sources[0]["name"]
+
+        # Determine verdict — when Mixed / Hybrid Authorship Detected is displayed, also display the most likely source
+        if overall_score >= 70:
+            verdict = "High Synthetic (AI) Probability"
+        elif overall_score >= 40:
+            if likely_source:
+                verdict = f"Mixed / Hybrid Authorship Detected (Likely: {likely_source})"
+            else:
+                verdict = "Mixed / Hybrid Authorship Detected"
+        elif overall_score >= 20:
+            verdict = "Likely Human with Minor Automated Assistance"
+        else:
+            verdict = "Authentic Human Authorship"
+
         # Build diagnostic flags
         ai_cnt = sum(1 for s in sentence_breakdown if s["label"] == "ai")
         flags = [f"{ai_cnt} of {len(sentences)} sentences classified as synthetic cadence"]
+
+        md_matches = _AI_MARKER_PATTERNS_MD.findall(text)
+        if md_matches:
+            flags.append(f"Markdown formatting keyword detected ({len(md_matches)} instances, e.g. '**word**'): characteristic AI generative marker")
 
         if likely_source and sorted_sources:
             flags.append(f"Top AI Source Baseline: {likely_source} ({sorted_sources[0]['score']}% match)")
@@ -239,6 +379,11 @@ class TagaDetector:
 
         scores_str = ", ".join(f"{k.upper()}: {int(round(v*100))}%" for k, v in base_res["model_scores"].items())
         flags.append(f"Model components: {scores_str}")
+
+        # AI marker / cadence diagnostics
+        marker_density = base_res.get("ai_marker_density", 0)
+        sentence_cv_val = base_res.get("sentence_cv", 0.5)
+        flags.append(f"AI cliché markers: {marker_density:.1f} per 100 words | Sentence CV: {sentence_cv_val:.2f}")
 
         if base_res.get("too_short"):
             flags.append("Note: Sample under 50 words; confidence may be lower.")

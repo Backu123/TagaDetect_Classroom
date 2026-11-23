@@ -194,7 +194,11 @@
 
         // Verdict pill
         const verdictPill = document.getElementById('verdict-pill');
-        verdictPill.textContent = result.verdict;
+        let displayVerdict = result.verdict;
+        if (displayVerdict.includes('Mixed / Hybrid') && result.likelySource && !displayVerdict.includes(result.likelySource)) {
+          displayVerdict = `${displayVerdict} (Likely: ${result.likelySource})`;
+        }
+        verdictPill.textContent = displayVerdict;
         verdictPill.className = `badge ${currentScore > 65 ? 'badge-ai' : (currentScore > 35 ? 'badge-pending' : 'badge-human')}`;
 
         // Metrics
