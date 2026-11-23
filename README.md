@@ -395,14 +395,13 @@ The inference backend is lightweight and runs comfortably on any free/low-tier c
 
 ## 👥 Authors & Acknowledgments
 
-Developed as an academic capstone research project in predictive machine learning and natural language processing at the **College of Computer Studies**:
+Developed as an academic final project for the subject CSST 102 - Basic Machinne Learning at the **College of Computer Studies** in **Laguna State Polytechnic University - San Pablo City Campus**:
 
-- **BSCS Research Team**:
-  - **Kristine Kaye Arida**
-  - **Neirro Ilagan**
-  - Project Collaborators & Faculty Advisers
-
-Special thanks to the open-source community for **scikit-learn**, **LightGBM**, **Vite**, and **Tailwind CSS**.
+- **Development Team**:
+  - **Timothy Rayjjell E. Audije**
+  - **John Wayne M. Capistrano**
+  - **Leilanie Alaine M. Cristobal**
+  - **Gabriel M. Samaniego**
 
 ---
 
