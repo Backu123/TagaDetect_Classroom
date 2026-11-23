@@ -14,7 +14,7 @@ import os
 import sys
 import traceback
 
-PORT = 8080
+PORT = int(os.environ.get("PORT", 8080))
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 
 BUNDLE_PATHS = [

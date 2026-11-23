@@ -1,16 +1,61 @@
-# React + Vite
+# 💻 TagaDetect Frontend (React 19 + Vite + Tailwind CSS)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This directory contains the modern Single Page Application (SPA) frontend for **TagaDetect**, built with React 19, Tailwind CSS v4, and Vite.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## ⚡ Tech Stack
 
-## React Compiler
+- **Framework**: [React 19](https://react.dev/)
+- **Bundler**: [Vite 6](https://vitejs.dev/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) with `@tailwindcss/vite`
+- **Backend / Auth**: [@supabase/supabase-js](https://supabase.com/docs/reference/javascript)
+- **Icons**: Optimized inline SVG & asset icons
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🚀 Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 1. Install Dependencies
+```bash
+npm install
+```
+
+### 2. Configure Supabase Environment
+Create a `.env` file in this directory:
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+### 3. Start Development Server
+```bash
+npm run dev
+```
+Navigate to **http://localhost:5173**.
+
+> **Note on API Proxy**: The Vite dev server automatically proxies any request starting with `/api` to `http://localhost:8080` (where `server.py` runs the ML model).
+
+---
+
+## 📦 Production Build
+
+To build the static production assets:
+```bash
+npm run build
+```
+Output files will be generated in `frontend/dist/`.
+
+To test the production build locally:
+```bash
+npm run preview
+```
+
+---
+
+## 🌐 Deploying to Vercel / Netlify
+
+1. In Vercel or Netlify, set **Root Directory** to `frontend`.
+2. Build Command: `npm run build`
+3. Output Directory: `dist`
+4. Provide `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` under Environment Variables.
